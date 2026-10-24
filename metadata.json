@@ -1,0 +1,8 @@
+{
+  "name": "LUMA - AI Language Tutor",
+  "description": "Find your voice. Think in a new language. Premium AI-powered conversational language tutor with real-time speech, Supernova Particle Orb, and Neon Serverless PostgreSQL persistence.",
+  "requestFramePermissions": [
+    "microphone"
+  ],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

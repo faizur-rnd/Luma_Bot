@@ -1,0 +1,736 @@
+# LUMA — REPOSITORY-FIRST REQUIREMENTS ANALYSIS, PRODUCT IMPROVEMENT & PRODUCTION READINESS
+
+**Existing GitHub repository:** https://github.com/Faizur2480/LinguaAI.git
+
+**Product name:** LUMA  
+**Database target:** Neon Serverless PostgreSQL  
+**Target platforms:** Existing web application and existing mobile application  
+**Brand direction:** Original multicolor Aurora identity with fully supported light and dark modes
+
+## PRIMARY OBJECTIVE
+
+Act as the Principal Software Engineer, Product Architect, Requirements Analyst, UI/UX Designer, Database Architect, AI Engineer, Mobile Engineer, QA Lead, Security Reviewer, and Release Manager.
+
+Your mission is to analyze the actual existing LUMA project before making changes, establish the real requirements, identify defects and missing functionality, and then implement and verify improvements without unnecessarily rewriting the application or breaking existing features.
+
+**The first phase must be repository discovery and requirements analysis. Do not begin by generating new UI, replacing the architecture, or implementing features based on assumptions.**
+
+Do not stop after producing an audit or implementation plan. After completing the analysis, proceed with actual changes in the connected environment wherever access permits.
+
+Never claim that a repository was inspected, a file was modified, a database connected, or a test passed unless you have evidence that it happened.
+
+---
+
+# PHASE 1 — ACCESS AND INSPECT THE EXISTING GITHUB REPOSITORY
+
+## 1.1 Verify repository access
+
+First, determine whether you can actually access the repository:
+
+https://github.com/Faizur2480/LinguaAI.git
+
+Use the Git integration or repository connection supported by the current environment.
+
+If direct GitHub access is unavailable, explicitly state the limitation and inspect only the files genuinely available to you. Do not pretend to have inspected remote source code.
+
+Determine whether the working environment is connected to the intended repository and whether modifications can be saved back to it.
+
+Record the current branch and commit when accessible. Check the working tree and preserve existing uncommitted changes.
+
+Do not overwrite the repository, force-push, delete branches, or perform destructive Git operations.
+
+## 1.2 Inspect the actual project structure
+
+Before editing, inspect the relevant project files, directories, configurations, and documentation.
+
+Identify:
+
+- Web frontend framework and entry points.
+- Mobile application framework and entry points.
+- Backend framework, API routes, and service boundaries.
+- Existing authentication provider and session management.
+- Current database, persistence layer, schema, and migrations.
+- Existing AI model integrations and provider interfaces.
+- Speech-to-text, voice activity detection, and text-to-speech implementation.
+- Voice session state management and audio playback.
+- Lesson content, curriculum, assessments, and progress tracking.
+- Existing UI component library and design tokens.
+- Current light/dark theme implementation.
+- Routing, navigation, onboarding, settings, and account management.
+- PWA configuration, Android configuration, and iOS configuration where applicable.
+- Build scripts, package managers, dependency lockfiles, and CI configuration.
+- Unit, integration, end-to-end, and mobile tests.
+- Deployment configuration, secrets management, and environment variables.
+- Existing documentation, specifications, TODOs, and known limitations.
+
+Use the actual repository structure to determine which files require further inspection.
+
+Do not assume that the project uses React, Flutter, Express, FastAPI, Supabase, Firebase, or any other specific technology until the repository confirms it.
+
+Do not create a second backend, authentication system, database, design system, or AI pipeline when an existing implementation can be safely extended.
+
+## 1.3 Establish the baseline
+
+Before changing code, determine which existing checks can be run safely.
+
+Record:
+
+- Current build status.
+- Existing test results.
+- Type-checking and linting results where supported.
+- Existing dependency or configuration failures.
+- Known broken user journeys.
+- Existing functionality that already works.
+- Checks blocked by unavailable credentials, services, hardware, or infrastructure.
+
+Preserve the baseline results so new regressions can be distinguished from pre-existing problems.
+
+Do not remove failing tests, weaken assertions, or alter the baseline to make the final report look better.
+
+---
+
+# PHASE 2 — CONVERT THE PRODUCT REQUIREMENTS INTO AN ACCEPTANCE SPECIFICATION
+
+Create `docs/luma-requirements-analysis.md` before major implementation work.
+
+Analyze the repository against the requirements in this prompt and all relevant specifications accessible in the repository.
+
+For each requirement, document:
+
+1. Requirement ID.
+2. Requirement description.
+3. Business and user value.
+4. Existing implementation and relevant file paths.
+5. Current behavior and evidence.
+6. Gap or defect.
+7. Priority and dependencies.
+8. Proposed implementation.
+9. Acceptance criteria.
+10. Verification method.
+11. Actual verification status.
+
+Use these statuses:
+
+- **PASS:** Implemented and supported by sufficient verification evidence.
+- **FAIL:** A confirmed defect or unmet acceptance criterion exists.
+- **BLOCKED:** Verification or implementation depends on unavailable infrastructure, credentials, hardware, or access.
+- **NOT STARTED:** Work has not yet begun.
+
+Classify requirements as:
+
+- P0 — Critical security, data integrity, or release blockers.
+- P1 — Core product functionality and essential user journeys.
+- P2 — Important usability, visual consistency, and reliability improvements.
+- P3 — Optional enhancements and polish.
+
+Do not mark a requirement as PASS simply because a file exists or a configuration option is present.
+
+Identify conflicting specifications explicitly. Preserve existing behavior unless a documented requirement authorizes a change.
+
+Where requirements are ambiguous, document the assumption and choose the least disruptive implementation consistent with the product goals.
+
+## Required analysis documents
+
+Create or update:
+
+- `docs/luma-requirements-analysis.md`
+- `docs/luma-audit.md`
+- `docs/luma-implementation-plan.md`
+- `docs/luma-acceptance-matrix.md`
+
+Do not spend the entire execution period writing documents. Once the repository has been sufficiently analyzed and the implementation plan is grounded in actual evidence, begin implementation.
+
+---
+
+# PHASE 3 — SAFE IMPLEMENTATION AND CHANGE MANAGEMENT
+
+## 3.1 Preserve working functionality
+
+Keep existing functionality, user data, API contracts, routes, authentication flows, database migrations, and platform integrations wherever possible.
+
+Before modifying an existing component:
+
+1. Inspect its callers and dependencies.
+2. Understand its current behavior.
+3. Identify affected platforms.
+4. Identify related tests and API contracts.
+5. Define the expected change.
+6. Implement the smallest coherent change.
+7. Run relevant verification.
+8. Record regressions and unresolved risks.
+
+Do not replace a functioning product with a disconnected prototype.
+
+Do not remove useful features merely because they are unfinished. Repair them, clearly identify their limitations, or document a justified retirement.
+
+## 3.2 Use the existing architecture
+
+Implement improvements using the existing frameworks and conventions unless the audit establishes a concrete reason to change them.
+
+Reuse existing components, API clients, authentication providers, state management, persistence layers, and test utilities.
+
+Introduce dependencies only when their value justifies their maintenance, performance, security, and bundle-size costs.
+
+Avoid unnecessary rewrites, duplicate abstractions, dead code, fake functionality, and redundant packages.
+
+---
+
+# PHASE 4 — LUMA BRAND IDENTITY AND MULTICOLOR AURORA DESIGN SYSTEM
+
+Create a distinctive LUMA visual identity. Do not clone the branding, logo, exact layouts, or signature visual styling of another website.
+
+Use established products only as inspiration for usability, consistency, accessibility, and visual hierarchy.
+
+## 4.1 Brand direction
+
+Product name: **LUMA**
+
+Tagline: **Find your voice. Think in a new language.**
+
+Design direction:
+
+- Premium and futuristic.
+- Multicolor Aurora visual identity.
+- Minimal, readable application surfaces.
+- Strong cyan, blue, violet, magenta, pink, coral, orange, and mint accents.
+- A recognizable animated supernova particle orb.
+- Consistent design language across web and mobile.
+- Fully functional light and dark themes.
+
+Keep the interface expressive but avoid using every accent color on every component.
+
+## 4.2 Multicolor brand tokens
+
+Use the following colors as the initial palette, subject to accessibility verification.
+
+| Token | HEX | Intended use |
+|---|---|---|
+| Aurora Cyan | `#22D3EE` | Voice activity and highlights |
+| Electric Blue | `#3B82F6` | Links and information |
+| Cosmic Violet | `#8B5CF6` | Brand accent and AI interaction |
+| Neon Magenta | `#D946EF` | Orb glow and special highlights |
+| Aurora Pink | `#F472B6` | Secondary accents and achievements |
+| Coral Pink | `#FB7185` | Warm highlights |
+| Solar Orange | `#FB923C` | Milestones and energy |
+| Mint Green | `#34D399` | Success and progress |
+
+Use darker accent variants in light mode when needed to maintain readable text and control contrast.
+
+## 4.3 Light theme tokens
+
+| Token | HEX |
+|---|---|
+| Main background | `#F8FAFC` |
+| Secondary background | `#F1F5F9` |
+| Card surface | `#FFFFFF` |
+| Elevated surface | `#FFFFFF` |
+| Border | `#E2E8F0` |
+| Primary text | `#0F172A` |
+| Secondary text | `#475569` |
+| Muted text | `#64748B` |
+| Primary action | `#6D28D9` |
+| Focus ring | `#7C3AED` |
+
+## 4.4 Dark theme tokens
+
+| Token | HEX |
+|---|---|
+| Main background | `#080B14` |
+| Secondary background | `#0D1220` |
+| Card surface | `#111827` |
+| Elevated surface | `#1E293B` |
+| Border | `#263044` |
+| Primary text | `#F8FAFC` |
+| Secondary text | `#CBD5E1` |
+| Muted text | `#94A3B8` |
+| Primary action | `#8B5CF6` |
+| Focus ring | `#A78BFA` |
+
+## 4.5 Gradient specifications
+
+Implement reusable gradient tokens.
+
+**Aurora Spectrum**
+
+`linear-gradient(135deg, #22D3EE 0%, #3B82F6 25%, #8B5CF6 50%, #D946EF 75%, #FB7185 100%)`
+
+**Cosmic Pulse**
+
+`linear-gradient(135deg, #8B5CF6 0%, #D946EF 50%, #FB7185 100%)`
+
+**Ocean Intelligence**
+
+`linear-gradient(135deg, #22D3EE 0%, #3B82F6 50%, #8B5CF6 100%)`
+
+**Sunrise Energy**
+
+`linear-gradient(135deg, #FB923C 0%, #FB7185 50%, #D946EF 100%)`
+
+**Mint Aurora**
+
+`linear-gradient(135deg, #34D399 0%, #22D3EE 50%, #3B82F6 100%)`
+
+Use gradients primarily for the orb, hero elements, selected progress indicators, and special highlights. Keep text-heavy screens and standard cards predominantly neutral.
+
+## 4.6 Semantic colors
+
+| State | Light mode | Dark mode |
+|---|---|---|
+| Success | `#15803D` | `#4ADE80` |
+| Warning | `#B45309` | `#FBBF24` |
+| Error | `#B91C1C` | `#F87171` |
+| Information | `#0369A1` | `#38BDF8` |
+| Focus | `#7C3AED` | `#A78BFA` |
+
+Use icons, labels, and appropriate text alongside status colors.
+
+Validate actual contrast ratios for foreground/background combinations. Do not assume that every brand color is suitable for small text or for a button label in both themes.
+
+## 4.7 Design tokens and theme architecture
+
+Inspect the existing styling architecture before deciding where tokens belong.
+
+Create or extend a centralized token system for:
+
+- Backgrounds and surfaces.
+- Text hierarchy.
+- Borders and dividers.
+- Primary, secondary, and destructive actions.
+- Brand accents and gradients.
+- Status colors.
+- Focus states.
+- Shadows and glow effects.
+- Typography.
+- Spacing.
+- Corner radii.
+- Motion and transitions.
+
+Use semantic variables rather than hardcoding colors separately in every component.
+
+Support:
+
+- Light mode.
+- Dark mode.
+- System preference.
+- Manual theme selection.
+- Persistent user preference.
+- Correct initialization without an unnecessary theme flash.
+- Consistent theme behavior across supported platforms.
+
+Do not simply invert the entire interface.
+
+Verify dialogs, menus, charts, inputs, disabled states, tooltips, code blocks, loading indicators, and validation messages in both themes.
+
+## 4.8 Responsive and accessible design
+
+Preserve the existing responsive architecture and improve it where necessary.
+
+Check:
+
+- Mobile and desktop layouts.
+- Text scaling.
+- Touch targets.
+- Keyboard navigation.
+- Visible focus indicators.
+- Reduced-motion preferences.
+- Screen-reader labels.
+- Empty, loading, error, offline, and disabled states.
+- Contrast and legibility.
+
+Avoid excessive gradients, glow, animation, and decorative clutter.
+
+---
+
+# PHASE 5 — SIGNATURE SUPERNOVA PARTICLE ORB
+
+Inspect the current voice screen, graphics stack, session state model, and performance characteristics before implementing the orb.
+
+Create a genuine animated particle orb that serves as LUMA's recognizable visual centerpiece.
+
+Requirements:
+
+- Dense particles forming a spherical structure.
+- Delicate connections or wireframe lines.
+- Organic deformation and traveling waves.
+- Cyan, blue, violet, pink, and magenta illumination.
+- A restrained glow and darker central region.
+- Smooth rotation and breathing motion.
+- Responsive rendering.
+- Reduced-motion support.
+- GPU resource cleanup.
+- A graceful fallback when advanced graphics are unavailable.
+
+Use the graphics framework compatible with the existing application.
+
+If the application uses React, evaluate compatible Three.js or React Three Fiber integration. If it uses Flutter, use an appropriate Flutter-compatible graphics implementation.
+
+Do not add an incompatible graphics stack.
+
+Connect the orb to genuine voice-session states:
+
+- Idle.
+- Listening.
+- Transcribing.
+- Thinking.
+- Speaking.
+- Interrupted.
+- Reconnecting.
+- Error or offline.
+
+Drive animations from actual application state and audio playback where supported.
+
+Never fake successful transcription, AI responses, microphone activity, or audio playback to make the orb appear functional.
+
+Keep interactive controls outside the decorative visualization and accessible to assistive technology.
+
+---
+
+# PHASE 6 — NEON POSTGRESQL INTEGRATION
+
+## 6.1 Inspect before designing the database
+
+Inspect the existing database, data models, authentication provider, backend, persistence strategy, and migration system before creating or modifying schema.
+
+Identify existing equivalent tables and avoid duplicating them.
+
+Preserve existing user data and migrations.
+
+Use Neon Serverless PostgreSQL as the shared database if compatible with the existing architecture and deployment constraints.
+
+## 6.2 Target architecture
+
+The intended architecture is:
+
+- Existing web client → authenticated backend API.
+- Existing mobile client → authenticated backend API.
+- Authenticated backend API → shared Neon PostgreSQL.
+- Backend → configured AI and speech services.
+
+Both clients must use the same logical user identities and persistent learning records.
+
+Adapt this architecture to the actual project. Reuse the existing backend when practical.
+
+**Never expose a privileged Neon connection string or database credentials to browser or mobile application code.**
+
+Do not connect mobile clients directly to Neon using unrestricted PostgreSQL credentials.
+
+## 6.3 Database configuration
+
+Use a server-side environment variable such as `DATABASE_URL`.
+
+Requirements:
+
+- Secure secret storage.
+- No committed production secrets.
+- No privileged credentials in client-side environment variables.
+- A safe `.env.example`.
+- Startup configuration validation.
+- Appropriate TLS configuration.
+- Suitable connection pooling for the actual runtime.
+- Safe database errors.
+- No credential leakage through logs.
+- Separate development, staging, and production settings.
+
+If credentials are unavailable, implement the feasible integration but mark live database verification as BLOCKED.
+
+## 6.4 Schema and migrations
+
+Inspect existing models and add or extend only the structures needed for:
+
+- User profiles and preferences.
+- Language settings.
+- Lessons and content versions.
+- Learning progress.
+- Vocabulary and review history.
+- Assessment attempts and authoritative results.
+- Mission completion.
+- Conversation sessions.
+- Optional transcription history.
+- Consent and privacy preferences.
+- Export and deletion requests.
+- Required audit records.
+
+Use appropriate constraints, indexes, foreign keys, transactions, and timestamps.
+
+Create repeatable migrations appropriate to the existing framework.
+
+Never run destructive migrations against production data without an explicitly approved migration and recovery procedure.
+
+## 6.5 Authentication and data isolation
+
+Reuse the existing authentication system if it is sound.
+
+Verify user identity on the backend.
+
+Enforce record ownership for every private-data operation.
+
+Never trust a client-supplied user ID as proof of authorization.
+
+Test access attempts involving another user's records.
+
+Use appropriate session expiry, token revocation, rate limiting, and request validation.
+
+Do not introduce a second independent account system unnecessarily.
+
+## 6.6 Cross-platform persistence
+
+Verify that both web and mobile clients can:
+
+- Load the same account's learning progress.
+- Save lesson completion.
+- Save assessment attempts.
+- Update preferences.
+- Retrieve conversation history where enabled.
+- Handle expired authentication.
+- Recover from network interruptions.
+- Avoid duplicate writes during retries.
+- Refresh the UI after successful persistence.
+
+Use appropriate idempotency mechanisms and conflict-resolution rules.
+
+Implement offline caching only where supported by the actual architecture.
+
+Do not claim real-time synchronization unless a genuine synchronization mechanism exists.
+
+## 6.7 Privacy and database operations
+
+Implement or repair:
+
+- Data export.
+- Account deletion.
+- Applicable retention rules.
+- Audio and transcript privacy settings.
+- Database health checks.
+- Migration documentation.
+- Connection timeouts and safe retries.
+- Backup and recovery procedures.
+- Monitoring and operational guidance.
+
+Do not claim that a backup restoration, live connection, or deletion has been verified unless the relevant operation was actually tested.
+
+Create `docs/neon-database.md`.
+
+---
+
+# PHASE 7 — AI VOICE AND LEARNING EXPERIENCE
+
+Inspect existing AI integrations before adding new providers.
+
+Where compatible with the current architecture, support:
+
+- Ollama for local language-model inference.
+- faster-whisper for speech-to-text.
+- Silero VAD for voice activity detection.
+- Piper for text-to-speech.
+
+Do not assume these services are already installed or configured.
+
+Use reusable provider interfaces and genuine runtime status.
+
+Implement or repair:
+
+- Listening and microphone permission handling.
+- Transcription.
+- AI response generation.
+- Speech playback.
+- Interruption and cancellation where supported.
+- Error and offline recovery.
+- Honest unavailable states.
+- Actual latency measurements.
+
+Preserve existing lessons and curriculum.
+
+Support guided speaking, free conversation, contextual corrections, vocabulary review, adaptive lessons, teach-back assessment, and genuine progress tracking where required by the existing specification.
+
+Support English as the target language and Tamil, Hindi, and Arabic bridge-language experiences only to the extent supported by the actual curriculum and speech services.
+
+Do not fabricate AI responses, assessment scores, pronunciation accuracy, or learner progress.
+
+---
+
+# PHASE 8 — SECURITY AND RELIABILITY
+
+Inspect and improve the actual implementation for:
+
+- Request validation.
+- Authentication and authorization.
+- User ownership enforcement.
+- Secure HTTP headers.
+- CORS configuration.
+- Rate limiting.
+- Request timeouts.
+- Body-size limits.
+- Centralized error handling.
+- Safe structured logging.
+- Secret management.
+- Prompt-injection handling.
+- Assessment integrity.
+- Privacy and consent.
+- Database transaction safety.
+
+Use the project's existing security framework where possible.
+
+Verify security behavior through appropriate tests. Configuration files alone are not evidence that a security control works.
+
+---
+
+# PHASE 9 — WEB, MOBILE, AND PWA COMPATIBILITY
+
+Preserve the existing mobile framework and its working features.
+
+Verify that both clients use the intended backend and shared persistence layer.
+
+For web, check:
+
+- Responsive layout.
+- Accessible controls.
+- Correct theme switching.
+- PWA behavior where supported.
+- Safe asset caching.
+- No leakage of private API responses through public service-worker caches.
+
+For mobile, check:
+
+- Correct backend configuration.
+- Secure token storage.
+- Microphone permissions.
+- Audio session behavior.
+- Touch-friendly controls.
+- Network recovery.
+- Offline behavior where supported.
+- Expired-session handling.
+- Consistent light/dark theme behavior.
+
+If device builds or physical-device tests cannot run in the available environment, record them as BLOCKED rather than claiming success.
+
+---
+
+# PHASE 10 — TESTING AND VERIFICATION
+
+Run relevant checks after implementation.
+
+Add or repair tests for:
+
+- Build and compilation.
+- Existing core user journeys.
+- Theme switching and persistence.
+- Design-token consistency.
+- Color contrast and accessibility.
+- Responsive layouts.
+- Orb state transitions.
+- Reduced-motion behavior.
+- Graphics fallback and resource cleanup.
+- Database configuration.
+- Database migrations.
+- Authentication.
+- User data isolation.
+- Cross-client persistence.
+- Duplicate-write protection.
+- Network interruption and recovery.
+- Export and deletion.
+- AI provider failure.
+- Speech pipeline failure.
+- Assessment scoring.
+
+Use isolated test databases or dedicated test schemas.
+
+Never run destructive tests against production data.
+
+Run the existing test suite without weakening assertions.
+
+Distinguish:
+
+- Passed checks.
+- Failed checks.
+- Checks blocked by missing dependencies.
+- Checks not executed.
+
+Record actual commands and outcomes where the environment permits.
+
+Fix regressions introduced by the changes before continuing to optional polish.
+
+---
+
+# PHASE 11 — DOCUMENTATION AND SAFE CLEANUP
+
+Create or update:
+
+- `docs/luma-requirements-analysis.md`
+- `docs/luma-audit.md`
+- `docs/luma-implementation-plan.md`
+- `docs/luma-cleanup-log.md`
+- `docs/neon-database.md`
+- `docs/luma-acceptance-matrix.md`
+- `docs/luma-release-report.md`
+
+Update the README with the actual architecture, setup instructions, environment variables, migration commands, AI configuration, test commands, deployment requirements, and known limitations.
+
+Remove dead code, redundant dependencies, obsolete screens, and unused components only after checking references and platform-specific usage.
+
+Record significant removals and their verification.
+
+---
+
+# PHASE 12 — FINAL RELEASE REVIEW
+
+Inspect the actual changes and available verification evidence.
+
+Review:
+
+- Repository access and working-tree integrity.
+- Requirements coverage.
+- Existing functionality preservation.
+- Brand consistency.
+- Light and dark theme behavior.
+- Accessibility and contrast.
+- Orb implementation and real state integration.
+- AI and speech failure handling.
+- Neon integration and migrations.
+- Authentication and user isolation.
+- Web/mobile persistence.
+- Privacy, export, and deletion.
+- Build and test results.
+- Documentation and unresolved risks.
+
+Create `docs/luma-release-report.md`.
+
+Choose exactly one verdict:
+
+**GO:** All release-blocking requirements are satisfied and sufficient verification evidence exists.
+
+**GO WITH CONDITIONS:** A limited release is justified only under clearly documented restrictions and after the required conditions are met.
+
+**NO-GO:** Release blockers remain, or sufficient evidence is unavailable to establish the required functionality and safety.
+
+Never issue GO while release blockers remain.
+
+Do not fabricate successful tests, live database connections, deployment results, device tests, restored backups, or human approvals.
+
+---
+
+# REQUIRED EXECUTION ORDER
+
+1. Verify repository access and identify the actual working project.
+2. Inspect the repository, specifications, architecture, and relevant files.
+3. Establish the baseline and preserve existing changes.
+4. Write the evidence-based requirements analysis.
+5. Identify P0/P1 blockers and define acceptance criteria.
+6. Create the implementation plan.
+7. Fix critical regressions and security issues.
+8. Implement the multicolor Aurora design system and theme support.
+9. Implement the supernova orb using the existing graphics architecture.
+10. Integrate Neon through the secure backend.
+11. Verify authentication, migrations, persistence, and user isolation.
+12. Repair the voice-learning and assessment journeys.
+13. Verify web/mobile compatibility and privacy behavior.
+14. Run available checks and fix regressions.
+15. Update documentation and the acceptance matrix.
+16. Produce the final evidence-based release report.
+
+Follow dependency order if the actual repository requires adjustments.
+
+Do not stop after generating a plan. Continue with real implementation wherever access permits. If the entire scope cannot be completed, finish a coherent, verified subset and clearly identify all remaining tasks.
+
+## FINAL ACCEPTANCE PRINCIPLE
+
+**Analyze the actual repository first. Establish what exists, what is broken, what is required, and how success will be verified. Then implement the smallest coherent set of changes that delivers a distinctive, accessible, multicolor LUMA experience with secure shared persistence and reliable voice-learning functionality—without destroying existing working features or making unsupported production-readiness claims.**
