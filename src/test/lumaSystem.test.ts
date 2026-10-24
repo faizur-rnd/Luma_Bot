@@ -83,8 +83,8 @@ export async function runAllLumaTests(): Promise<{ total: number; passed: number
     const en = getLanguageCapabilities('en');
     if (en.role !== 'target' && en.role !== 'both') throw new Error('English must be marked as target/both');
     if (en.speechRecognition !== 'full') throw new Error('English must have full speech recognition');
-    if (!en.textGeneration) throw new Error('English must support text generation');
-    if (!en.voiceActivityDetection) throw new Error('English must support VAD');
+    if (en.voiceActivityDetection !== false) throw new Error('English must honestly report no raw acoustic VAD for browser STT');
+    if (en.offlineAvailable !== false) throw new Error('English must honestly report no offline STT support');
   });
 
   runTest('Language Capabilities', 'Verifies Arabic target language registry completeness', () => {

@@ -1,13 +1,13 @@
 # LUMA — Find Your Voice. Think in a New Language.
 
-LUMA is an AI-powered conversational language tutor featuring real-time speech interaction, a signature 3D Supernova Particle Orb, structured CEFR curriculum, spoken Teach-Back assessments, and Neon Serverless PostgreSQL persistence.
+LUMA is an AI-powered conversational language tutor featuring real-time speech interaction, a signature 3D Voice Orb, structured CEFR curriculum, spoken Teach-Back assessments, and Neon Serverless PostgreSQL persistence.
 
 ---
 
 ## Key Features
 
 - **Multicolor Aurora Design System:** Authentic visual identity supporting fully responsive Light and Dark themes, Aurora brand tokens, and signature spectrum gradients.
-- **Signature 3D Supernova Particle Orb:** Built with Three.js featuring 1,920 dynamic particles, delicate wireframe connections, organic wave deformation, and Web Audio API live microphone reactivity.
+- **Signature 3D Voice Orb:** Built with Three.js featuring 1,920 dynamic particles, delicate wireframe connections, organic wave deformation, and Web Audio API live microphone reactivity.
 - **Dynamic Voice Session States:** Integrated across 8 genuine states: `idle`, `listening`, `transcribing`, `thinking`, `speaking`, `interrupted`, `reconnecting`, and `offline_error`.
 - **Multilingual Bridge Learning:** English target language with instant bridge support for Tamil (தமிழ்), Hindi (हिन्दी), Arabic (العربية), Spanish (Español), and French (Français).
 - **CEFR Guided Curriculum:** Progressive modules from Foundational A1 to Executive C1 with scenario simulations.

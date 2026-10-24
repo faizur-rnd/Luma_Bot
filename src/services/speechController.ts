@@ -3,7 +3,7 @@
 import { apiClient } from './apiClient.ts';
 
 export interface SpeechControllerCallbacks {
-  onStateChange: (state: 'idle' | 'listening' | 'transcribing' | 'thinking' | 'speaking' | 'interrupted' | 'reconnecting' | 'offline_error') => void;
+  onStateChange: (state: 'idle' | 'listening' | 'transcribing' | 'thinking' | 'speaking' | 'interrupted' | 'offline_error') => void;
   onTranscript: (text: string, isFinal: boolean) => void;
   onAudioLevel: (level: number) => void;
   onError: (errorMsg: string) => void;
@@ -255,7 +255,7 @@ export class SpeechController {
       this.playOrbChime('listen');
       this.callbacks.onStateChange('listening');
 
-      // Setup audio analysis for Supernova Orb reactivity
+      // Setup audio analysis for Voice Orb reactivity
       await this.startAudioAnalysis();
 
       this.isListeningActive = true;
@@ -351,6 +351,10 @@ export class SpeechController {
 
     try {
       const audioSrc = apiClient.getTtsAudioUrl(text, lang, gender);
+      if (!audioSrc) {
+        this.speakWithBrowser(text, onEnd, lang);
+        return;
+      }
       const audio = new Audio(audioSrc);
       this.currentAudio = audio;
       audio.volume = this.volume;

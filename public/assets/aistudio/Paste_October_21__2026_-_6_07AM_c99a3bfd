@@ -193,7 +193,7 @@ Design direction:
 - Multicolor Aurora visual identity.
 - Minimal, readable application surfaces.
 - Strong cyan, blue, violet, magenta, pink, coral, orange, and mint accents.
-- A recognizable animated supernova particle orb.
+- A recognizable animated voice orb particle orb.
 - Consistent design language across web and mobile.
 - Fully functional light and dark themes.
 
@@ -341,7 +341,7 @@ Avoid excessive gradients, glow, animation, and decorative clutter.
 
 ---
 
-# PHASE 5 — SIGNATURE SUPERNOVA PARTICLE ORB
+# PHASE 5 — SIGNATURE voice orb PARTICLE ORB
 
 Inspect the current voice screen, graphics stack, session state model, and performance characteristics before implementing the orb.
 
@@ -718,7 +718,7 @@ Do not fabricate successful tests, live database connections, deployment results
 6. Create the implementation plan.
 7. Fix critical regressions and security issues.
 8. Implement the multicolor Aurora design system and theme support.
-9. Implement the supernova orb using the existing graphics architecture.
+9. Implement the Voice Orb using the existing graphics architecture.
 10. Integrate Neon through the secure backend.
 11. Verify authentication, migrations, persistence, and user isolation.
 12. Repair the voice-learning and assessment journeys.

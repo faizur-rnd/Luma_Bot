@@ -55,7 +55,7 @@ export const CurriculumView: React.FC<CurriculumViewProps> = ({
 
   const markLessonComplete = async (lesson: CurriculumLesson) => {
     try {
-      const score = Math.floor(Math.random() * 11) + 90; // 90 to 100
+      const score = 100; // Completed practice milestone
       await apiClient.saveProgress(lesson.id, true, score, lesson.durationMinutes * 60);
       setProgressMap(prev => ({
         ...prev,
@@ -218,9 +218,14 @@ export const CurriculumView: React.FC<CurriculumViewProps> = ({
           >
             <div>
               <div className="flex items-center justify-between">
-                <span className="text-xs uppercase font-bold text-[#8B5CF6] tracking-wider">
-                  Lesson Focus
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs uppercase font-bold text-[#8B5CF6] tracking-wider">
+                    Lesson Focus
+                  </span>
+                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-500 border border-amber-500/20">
+                    Draft, not yet reviewed
+                  </span>
+                </div>
                 <span className="text-xs text-[#64748B] flex items-center gap-1">
                   <Clock className="w-3.5 h-3.5" />
                   {activeLesson.durationMinutes} minutes

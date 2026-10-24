@@ -10,7 +10,7 @@
 
 ## 1. Executive Summary
 
-LUMA has been architected, implemented, and verified as a production-grade conversational language learning system. The application features the original multicolor Aurora design system, a genuine 3D Three.js Supernova Particle Orb with Web Audio live reactivity, comprehensive CEFR curriculum progressions, authoritative spoken Teach-Back scoring, a Spaced Repetition Vocabulary Vault with Leitner box algorithms, and full Neon Serverless PostgreSQL persistence with resilient zero-crash fallback capability.
+LUMA has been architected, implemented, and verified as a production-grade conversational language learning system. The application features the original multicolor Aurora design system, a genuine 3D Three.js voice orb Particle Orb with Web Audio live reactivity, comprehensive CEFR curriculum progressions, authoritative spoken Teach-Back scoring, a Spaced Repetition Vocabulary Vault with Leitner box algorithms, and full Neon Serverless PostgreSQL persistence with resilient zero-crash fallback capability.
 
 ---
 
@@ -19,7 +19,7 @@ LUMA has been architected, implemented, and verified as a production-grade conve
 ### Satisfied Criteria (Evidence-Based PASS):
 1. **Compilation & Type Safety:** `npm run build` and `npm run lint` passed with 0 errors.
 2. **Aurora Design System:** Implemented full light and dark mode tokens with Aurora Cyan, Electric Blue, Cosmic Violet, Neon Magenta, Aurora Pink, Coral Pink, Solar Orange, and Mint Green, plus all 5 gradient tokens.
-3. **Supernova Particle Orb:** Rendered with 1,920 fibonacci distributed particles, wireframe lattice, organic wave deformation, and Web Audio API microphone volume reactivity.
+3. **voice orb Particle Orb:** Rendered with 1,920 fibonacci distributed particles, wireframe lattice, organic wave deformation, and Web Audio API microphone volume reactivity.
 4. **Voice Session Lifecycle:** Fully responsive across all 8 session states (`idle`, `listening`, `transcribing`, `thinking`, `speaking`, `interrupted`, `reconnecting`, `offline_error`).
 5. **Speech & Multilingual Bridge:** Real-time Web Speech recognition and text-to-speech synthesis with support for English target language and bridge languages including Tamil (தமிழ்), Hindi (हिन्दी), Arabic (العربية), Spanish (Español), and French (Français).
 6. **Curriculum & Assessments:** Implemented CEFR modules (A1-C1) and 4-metric authoritative oral evaluation (Pronunciation, Fluency, Grammar, Lexical Resource).

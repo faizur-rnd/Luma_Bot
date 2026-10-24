@@ -340,25 +340,27 @@ export const TeachBackAssessmentView: React.FC<TeachBackAssessmentViewProps> = (
                 </div>
               </div>
 
-              {/* Four Pillar Metrics */}
+              {/* Core Evaluated Metrics */}
               <div className="grid grid-cols-2 gap-3">
                 <div className="p-3 rounded-xl bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/10">
                   <div className="text-[10px] uppercase font-bold text-[#22D3EE]">Pronunciation</div>
-                  <div className="text-lg font-bold text-white mt-1">
-                    {latestAssessment.pronunciation_score}%
+                  <div className="text-sm font-semibold text-white/80 mt-1">
+                    Not measured
                   </div>
-                  <div className="h-1 rounded-full bg-black/10 dark:bg-white/10 mt-1">
-                    <div className="h-full bg-[#22D3EE] rounded-full" style={{ width: `${latestAssessment.pronunciation_score}%` }} />
+                  <div className="text-[9px] text-[#64748B] mt-0.5 leading-tight">
+                    Browser speech recognition provides text only, not acoustic data.
                   </div>
                 </div>
 
                 <div className="p-3 rounded-xl bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/10">
-                  <div className="text-[10px] uppercase font-bold text-[#3B82F6]">Fluency & Rhythm</div>
+                  <div className="text-[10px] uppercase font-bold text-[#3B82F6]">Fluency (WPM)</div>
                   <div className="text-lg font-bold text-white mt-1">
-                    {latestAssessment.fluency_score}%
+                    {recordingSeconds > 0 && transcript.trim()
+                      ? `${Math.round((transcript.trim().split(/\s+/).length / (recordingSeconds / 60)))} WPM`
+                      : 'Not measured'}
                   </div>
-                  <div className="h-1 rounded-full bg-black/10 dark:bg-white/10 mt-1">
-                    <div className="h-full bg-[#3B82F6] rounded-full" style={{ width: `${latestAssessment.fluency_score}%` }} />
+                  <div className="text-[9px] text-[#64748B] mt-0.5">
+                    {recordingSeconds > 0 ? `Calculated from ${recordingSeconds}s spoken audio` : 'Awaiting live audio recording'}
                   </div>
                 </div>
 

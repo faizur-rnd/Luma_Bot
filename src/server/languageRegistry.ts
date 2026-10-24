@@ -13,6 +13,7 @@ export interface LanguageCapability {
   pronunciationEvaluation: 'acoustic_phonetic' | 'lexical_comparison' | 'unsupported';
   translationQuality: 'high' | 'moderate' | 'basic';
   offlineAvailable: boolean;
+  status: 'verified' | 'experimental';
   notes: string;
 }
 
@@ -25,11 +26,12 @@ export const LANGUAGE_REGISTRY: Record<string, LanguageCapability> = {
     textGeneration: true,
     speechRecognition: 'full',
     speechSynthesis: 'natural_tts',
-    voiceActivityDetection: true,
-    pronunciationEvaluation: 'acoustic_phonetic',
+    voiceActivityDetection: false,
+    pronunciationEvaluation: 'unsupported',
     translationQuality: 'high',
-    offlineAvailable: true,
-    notes: 'Full target and bridge language. Supported by Web Speech API (en-US), Three.js Supernova Orb live reactivity, and CEFR A1-C1 curriculum.'
+    offlineAvailable: false,
+    status: 'verified',
+    notes: 'Full target and bridge language. Supported by Web Speech API (en-US), Voice Orb reactivity, and CEFR A1-C1 curriculum.'
   },
   ar: {
     code: 'ar',
@@ -39,10 +41,11 @@ export const LANGUAGE_REGISTRY: Record<string, LanguageCapability> = {
     textGeneration: true,
     speechRecognition: 'full',
     speechSynthesis: 'natural_tts',
-    voiceActivityDetection: true,
-    pronunciationEvaluation: 'acoustic_phonetic',
+    voiceActivityDetection: false,
+    pronunciationEvaluation: 'unsupported',
     translationQuality: 'high',
-    offlineAvailable: true,
+    offlineAvailable: false,
+    status: 'verified',
     notes: 'Full target and bridge language. Modern Standard Arabic (الفصحى) with RTL typography, Web Speech API (ar-SA), and phonological root coaching.'
   },
   de: {
@@ -53,10 +56,11 @@ export const LANGUAGE_REGISTRY: Record<string, LanguageCapability> = {
     textGeneration: true,
     speechRecognition: 'full',
     speechSynthesis: 'natural_tts',
-    voiceActivityDetection: true,
-    pronunciationEvaluation: 'acoustic_phonetic',
+    voiceActivityDetection: false,
+    pronunciationEvaluation: 'unsupported',
     translationQuality: 'high',
-    offlineAvailable: true,
+    offlineAvailable: false,
+    status: 'verified',
     notes: 'Full target and bridge language. Supported by Web Speech API (de-DE), case declension coaching (der/die/das), and conversational generative AI.'
   },
   ta: {
@@ -67,10 +71,11 @@ export const LANGUAGE_REGISTRY: Record<string, LanguageCapability> = {
     textGeneration: true,
     speechRecognition: 'browser_dependent',
     speechSynthesis: 'standard_tts',
-    voiceActivityDetection: true,
-    pronunciationEvaluation: 'lexical_comparison',
+    voiceActivityDetection: false,
+    pronunciationEvaluation: 'unsupported',
     translationQuality: 'high',
     offlineAvailable: false,
+    status: 'verified',
     notes: 'Comprehensive bridge language support. Explanations, translations, and pedagogical insights natively supported.'
   },
   hi: {
@@ -81,10 +86,11 @@ export const LANGUAGE_REGISTRY: Record<string, LanguageCapability> = {
     textGeneration: true,
     speechRecognition: 'browser_dependent',
     speechSynthesis: 'natural_tts',
-    voiceActivityDetection: true,
-    pronunciationEvaluation: 'lexical_comparison',
+    voiceActivityDetection: false,
+    pronunciationEvaluation: 'unsupported',
     translationQuality: 'high',
     offlineAvailable: false,
+    status: 'verified',
     notes: 'Full bridge language support with Devanagari script explanations and audio model synthesis.'
   },
   es: {
@@ -95,10 +101,11 @@ export const LANGUAGE_REGISTRY: Record<string, LanguageCapability> = {
     textGeneration: true,
     speechRecognition: 'full',
     speechSynthesis: 'natural_tts',
-    voiceActivityDetection: true,
-    pronunciationEvaluation: 'acoustic_phonetic',
+    voiceActivityDetection: false,
+    pronunciationEvaluation: 'unsupported',
     translationQuality: 'high',
-    offlineAvailable: true,
+    offlineAvailable: false,
+    status: 'verified',
     notes: 'Full target and bridge language. Supported by Web Speech API (es-ES / es-MX), CEFR A1-B2 Spanish curriculum, DELE exam preparation, and rich conversational AI.'
   },
   fr: {
@@ -109,10 +116,11 @@ export const LANGUAGE_REGISTRY: Record<string, LanguageCapability> = {
     textGeneration: true,
     speechRecognition: 'full',
     speechSynthesis: 'natural_tts',
-    voiceActivityDetection: true,
-    pronunciationEvaluation: 'lexical_comparison',
+    voiceActivityDetection: false,
+    pronunciationEvaluation: 'unsupported',
     translationQuality: 'high',
-    offlineAvailable: true,
+    offlineAvailable: false,
+    status: 'verified',
     notes: 'Complete bridge support for French-speaking learners.'
   },
   ja: {
@@ -123,11 +131,12 @@ export const LANGUAGE_REGISTRY: Record<string, LanguageCapability> = {
     textGeneration: true,
     speechRecognition: 'browser_dependent',
     speechSynthesis: 'standard_tts',
-    voiceActivityDetection: true,
-    pronunciationEvaluation: 'lexical_comparison',
+    voiceActivityDetection: false,
+    pronunciationEvaluation: 'unsupported',
     translationQuality: 'high',
     offlineAvailable: false,
-    notes: 'Kanji, Kana, and Romaji explanations supported.'
+    status: 'experimental',
+    notes: 'Experimental bridge language. Basic Kanji and Kana support.'
   }
 };
 
@@ -144,6 +153,7 @@ export function getLanguageCapabilities(langCode: string): LanguageCapability {
     pronunciationEvaluation: 'unsupported',
     translationQuality: 'moderate',
     offlineAvailable: false,
-    notes: 'Custom language. Relies on general LLM multilingual text processing.'
+    status: 'experimental',
+    notes: 'Experimental unverified language. Relies on general LLM multilingual text processing.'
   };
 }

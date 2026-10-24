@@ -3,15 +3,11 @@ import {
   Sparkles, 
   BookOpen, 
   Award, 
-  Layers, 
-  Database, 
+  Home, 
   Sun, 
   Moon, 
   Flame, 
-  Globe2, 
-  ShieldCheck,
-  Target,
-  Compass
+  Settings 
 } from 'lucide-react';
 import { UserProfile } from '../services/apiClient.ts';
 
@@ -21,9 +17,7 @@ interface NavbarProps {
   theme: 'dark' | 'light';
   setTheme: (theme: 'dark' | 'light') => void;
   profile: UserProfile | null;
-  onUpdateProfile: (updates: Partial<UserProfile>) => void;
-  dbStatus: { isLive: boolean; provider: string };
-  onOpenOnboarding?: () => void;
+  onOpenSettings: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -32,165 +26,101 @@ export const Navbar: React.FC<NavbarProps> = ({
   theme,
   setTheme,
   profile,
-  onUpdateProfile,
-  dbStatus,
-  onOpenOnboarding
+  onOpenSettings
 }) => {
-  const targetLanguages = [
-    { code: 'en', label: 'English' },
-    { code: 'ar', label: 'العربية (Arabic)' },
-    { code: 'es', label: 'Español (Spanish)' },
-    { code: 'de', label: 'Deutsch (German)' }
-  ];
-
-  const bridgeLanguages = [
-    { code: 'ta', label: 'தமிழ் (Tamil)' },
-    { code: 'en', label: 'English' },
-    { code: 'hi', label: 'हिन्दी (Hindi)' },
-    { code: 'ar', label: 'العربية (Arabic)' },
-    { code: 'es', label: 'Español (Spanish)' },
-    { code: 'fr', label: 'Français (French)' },
-    { code: 'de', label: 'Deutsch (German)' }
-  ];
-
-  const navItems = [
-    { id: 'missions', label: 'Daily Mission (70/20/10)', icon: Target },
-    { id: 'voice', label: 'Voice AI', icon: Sparkles },
-    { id: 'curriculum', label: 'Curriculum', icon: BookOpen },
-    { id: 'assessment', label: 'Teach-Back', icon: Award },
-    { id: 'vocabulary', label: 'Vocab Vault', icon: Layers },
-    { id: 'database', label: 'Neon DB', icon: Database }
+  const learnerTabs = [
+    { id: 'home', label: 'Home', icon: Home, panelId: 'panel-home' },
+    { id: 'talk', label: 'Talk', icon: Sparkles, panelId: 'panel-talk' },
+    { id: 'learn', label: 'Learn', icon: BookOpen, panelId: 'panel-learn' },
+    { id: 'progress', label: 'Progress', icon: Award, panelId: 'panel-progress' }
   ];
 
   return (
-    <header className="sticky top-0 z-50 backdrop-blur-xl border-b transition-colors duration-200"
+    <header
+      className="sticky top-0 z-40 backdrop-blur-xl border-b transition-colors duration-200"
       style={{
-        backgroundColor: theme === 'dark' ? 'rgba(8, 11, 20, 0.85)' : 'rgba(248, 250, 252, 0.88)',
+        backgroundColor: theme === 'dark' ? 'rgba(8, 11, 20, 0.90)' : 'rgba(248, 250, 252, 0.92)',
         borderColor: theme === 'dark' ? '#263044' : '#E2E8F0'
       }}
+      role="banner"
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
         {/* Brand / Logo */}
-        <div className="flex items-center gap-3 cursor-pointer" onClick={() => setActiveTab('voice')}>
-          <div className="relative w-9 h-9 rounded-xl bg-gradient-aurora flex items-center justify-center p-[2px] shadow-lg shadow-[#8B5CF6]/20">
+        <button
+          onClick={() => setActiveTab('home')}
+          className="flex items-center gap-2.5 text-left cursor-pointer focus-visible:ring-2 focus-visible:ring-violet-500 rounded-lg p-1"
+          aria-label="LUMA Home"
+        >
+          <div className="relative w-8 h-8 rounded-xl bg-gradient-to-tr from-violet-600 via-indigo-500 to-cyan-400 flex items-center justify-center p-[2px] shadow-sm">
             <div className="w-full h-full rounded-[10px] bg-[#080B14] flex items-center justify-center">
-              <span className="font-extrabold text-sm tracking-wider bg-gradient-aurora bg-clip-text text-transparent">
+              <span className="font-extrabold text-sm tracking-wider text-white">
                 L
               </span>
             </div>
           </div>
           <div>
-            <div className="flex items-center gap-2">
-              <span className="text-xl font-bold tracking-tight bg-gradient-aurora bg-clip-text text-transparent">
-                LUMA
-              </span>
-              <span className="text-[10px] uppercase font-semibold px-1.5 py-0.5 rounded border border-[#22D3EE]/30 bg-[#22D3EE]/10 text-[#22D3EE]">
-                Aurora 2.0
-              </span>
-            </div>
-            <p className="text-[10px] hidden sm:block font-medium tracking-wide text-[#64748B] dark:text-[#94A3B8]">
-              Find your voice. Think in a new language.
-            </p>
+            <span className="text-lg font-bold tracking-tight bg-gradient-to-r from-violet-400 to-cyan-400 bg-clip-text text-transparent">
+              LUMA
+            </span>
+            <span className="sr-only">Language Tutor</span>
           </div>
-        </div>
+        </button>
 
-        {/* Primary Navigation Tabs */}
-        <nav className="hidden md:flex items-center gap-1.5 p-1 rounded-xl border"
+        {/* 4 Primary Learner Tabs with real tablist semantics */}
+        <nav
+          className="hidden md:flex items-center gap-1.5 p-1 rounded-xl border"
+          role="tablist"
+          aria-label="Main Navigation"
           style={{
             backgroundColor: theme === 'dark' ? '#0D1220' : '#F1F5F9',
             borderColor: theme === 'dark' ? '#263044' : '#E2E8F0'
           }}
         >
-          {navItems.map(item => {
+          {learnerTabs.map((item) => {
             const Icon = item.icon;
             const isActive = activeTab === item.id;
             return (
               <button
                 key={item.id}
+                id={`tab-${item.id}`}
+                role="tab"
+                aria-selected={isActive}
+                aria-controls={item.panelId}
+                tabIndex={isActive ? 0 : -1}
                 onClick={() => setActiveTab(item.id)}
-                className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 cursor-pointer ${
+                className={`min-h-[44px] flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition-all duration-150 cursor-pointer focus-visible:ring-2 focus-visible:ring-violet-500 ${
                   isActive
-                    ? 'bg-gradient-cosmic text-white shadow-md shadow-[#8B5CF6]/30'
-                    : 'text-[#475569] dark:text-[#CBD5E1] hover:text-[#0F172A] dark:hover:text-white'
+                    ? 'bg-violet-600 text-white shadow-md'
+                    : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
                 }`}
               >
-                <Icon className="w-3.5 h-3.5" />
+                <Icon className="w-4 h-4" />
                 <span>{item.label}</span>
-                {item.id === 'database' && (
-                  <span className={`w-1.5 h-1.5 rounded-full ${dbStatus.isLive ? 'bg-[#34D399]' : 'bg-[#FB923C]'}`} />
-                )}
               </button>
             );
           })}
         </nav>
 
-        {/* Right Action Controls */}
+        {/* Right Controls */}
         <div className="flex items-center gap-2.5">
-          {/* Target Language Selector */}
-          <div className="relative flex items-center">
-            <select
-              value={profile?.target_language || 'en'}
-              onChange={(e) => onUpdateProfile({ target_language: e.target.value })}
-              className="px-2.5 py-1.5 text-xs font-bold rounded-lg border appearance-none cursor-pointer focus:outline-none transition-colors"
-              style={{
-                backgroundColor: theme === 'dark' ? '#064E3B' : '#ECFDF5',
-                borderColor: '#10B981',
-                color: theme === 'dark' ? '#6EE7B7' : '#065F46'
-              }}
-              title="Target Language: The language you are learning with LUMA"
-            >
-              {targetLanguages.map(lang => (
-                <option key={lang.code} value={lang.code} className="bg-[#111827] text-white">
-                  Target: {lang.label}
-                </option>
-              ))}
-            </select>
+          {/* Daily Streak Indicator */}
+          <div
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold select-none"
+            style={{
+              borderColor: 'rgba(251, 146, 60, 0.4)',
+              backgroundColor: 'rgba(251, 146, 60, 0.1)',
+              color: '#FB923C'
+            }}
+            title="Daily Practice Streak"
+          >
+            <Flame className="w-4 h-4 text-orange-400" />
+            <span>{profile?.streak_count || 1} day streak</span>
           </div>
 
-          {/* Bridge Language Selector */}
-          <div className="relative flex items-center">
-            <Globe2 className="w-3.5 h-3.5 absolute left-2.5 text-[#8B5CF6] pointer-events-none" />
-            <select
-              value={profile?.bridge_language || 'ta'}
-              onChange={(e) => onUpdateProfile({ bridge_language: e.target.value })}
-              className="pl-7 pr-3 py-1.5 text-xs font-medium rounded-lg border appearance-none cursor-pointer focus:outline-none transition-colors"
-              style={{
-                backgroundColor: theme === 'dark' ? '#111827' : '#FFFFFF',
-                borderColor: theme === 'dark' ? '#263044' : '#E2E8F0',
-                color: theme === 'dark' ? '#F8FAFC' : '#0F172A'
-              }}
-              title="Bridge Language: Your native language for explanations"
-            >
-              {bridgeLanguages.map(lang => (
-                <option key={lang.code} value={lang.code}>
-                  Bridge: {lang.label}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Onboarding Wizard Trigger */}
-          {onOpenOnboarding && (
-            <button
-              onClick={onOpenOnboarding}
-              className="hidden sm:flex items-center gap-1.5 px-3 py-1 rounded-lg border border-[#8B5CF6]/40 bg-[#8B5CF6]/10 text-[#8B5CF6] hover:bg-[#8B5CF6]/20 text-xs font-semibold cursor-pointer transition-colors"
-              title="Retake or adjust the 10-Question Onboarding Assessment"
-            >
-              <Compass className="w-3.5 h-3.5" />
-              <span>10-Q Plan</span>
-            </button>
-          )}
-
-          {/* Daily Streak Badge */}
-          <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-[#FB923C]/30 bg-[#FB923C]/10 text-[#FB923C] text-xs font-semibold">
-            <Flame className="w-3.5 h-3.5 text-[#FB923C]" />
-            <span>{profile?.streak_count || 5}d</span>
-          </div>
-
-          {/* Theme Toggle Button */}
+          {/* Theme Toggle Button (44px min touch target) */}
           <button
             onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-            className="p-2 rounded-lg border transition-colors cursor-pointer hover:border-[#8B5CF6]"
+            className="w-11 h-11 rounded-xl border flex items-center justify-center transition-colors cursor-pointer hover:border-violet-500 focus-visible:ring-2 focus-visible:ring-violet-500"
             style={{
               backgroundColor: theme === 'dark' ? '#111827' : '#FFFFFF',
               borderColor: theme === 'dark' ? '#263044' : '#E2E8F0',
@@ -199,30 +129,53 @@ export const Navbar: React.FC<NavbarProps> = ({
             aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
           >
             {theme === 'dark' ? (
-              <Sun className="w-4 h-4 text-[#FB923C]" />
+              <Sun className="w-4 h-4 text-orange-400" />
             ) : (
-              <Moon className="w-4 h-4 text-[#6D28D9]" />
+              <Moon className="w-4 h-4 text-violet-600" />
             )}
+          </button>
+
+          {/* Settings & Profile Button (44px min touch target) */}
+          <button
+            onClick={onOpenSettings}
+            className="w-11 h-11 rounded-xl border flex items-center justify-center transition-colors cursor-pointer hover:border-violet-500 focus-visible:ring-2 focus-visible:ring-violet-500"
+            style={{
+              backgroundColor: theme === 'dark' ? '#111827' : '#FFFFFF',
+              borderColor: theme === 'dark' ? '#263044' : '#E2E8F0',
+              color: theme === 'dark' ? '#F8FAFC' : '#0F172A'
+            }}
+            aria-label="Open settings and profile"
+            title="Settings & Privacy"
+          >
+            <Settings className="w-4 h-4 text-slate-400 hover:text-slate-200" />
           </button>
         </div>
       </div>
 
-      {/* Mobile Nav Bar */}
-      <div className="md:hidden flex items-center justify-around border-t py-2 px-1"
+      {/* Mobile Tab Navigation Bar */}
+      <nav
+        className="md:hidden flex items-center justify-around border-t py-1 px-1"
+        role="tablist"
+        aria-label="Mobile Navigation"
         style={{
           borderColor: theme === 'dark' ? '#263044' : '#E2E8F0',
           backgroundColor: theme === 'dark' ? '#080B14' : '#FFFFFF'
         }}
       >
-        {navItems.map(item => {
+        {learnerTabs.map((item) => {
           const Icon = item.icon;
           const isActive = activeTab === item.id;
           return (
             <button
               key={item.id}
+              role="tab"
+              aria-selected={isActive}
+              aria-controls={item.panelId}
               onClick={() => setActiveTab(item.id)}
-              className={`flex flex-col items-center gap-1 py-1 px-2 text-[10px] font-medium ${
-                isActive ? 'text-[#8B5CF6]' : 'text-[#64748B]'
+              className={`min-h-[44px] flex flex-col items-center justify-center gap-1 py-1 px-3 text-[11px] font-medium transition-colors ${
+                isActive
+                  ? 'text-violet-500 font-bold'
+                  : 'text-slate-500 dark:text-slate-400'
               }`}
             >
               <Icon className="w-4 h-4" />
@@ -230,7 +183,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             </button>
           );
         })}
-      </div>
+      </nav>
     </header>
   );
 };

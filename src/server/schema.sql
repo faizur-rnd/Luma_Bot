@@ -1,23 +1,39 @@
--- LUMA Neon PostgreSQL Initial Schema
--- Target: Neon Serverless PostgreSQL
+-- LUMA Production PostgreSQL Schema
+-- Target: Neon Serverless PostgreSQL / Cloud SQL / Standard PostgreSQL 15+
 
 CREATE TABLE IF NOT EXISTS users (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   email VARCHAR(255) UNIQUE NOT NULL,
+  password_hash VARCHAR(255) NOT NULL,
   display_name VARCHAR(100) NOT NULL,
   avatar_url TEXT,
   target_language VARCHAR(10) DEFAULT 'en',
-  bridge_language VARCHAR(10) DEFAULT 'ta', -- 'ta' (Tamil), 'hi' (Hindi), 'ar' (Arabic), 'es' (Spanish), 'fr' (French)
+  bridge_language VARCHAR(10) DEFAULT 'ta',
   proficiency_level VARCHAR(20) DEFAULT 'B1',
   daily_goal_minutes INTEGER DEFAULT 15,
-  streak_count INTEGER DEFAULT 3,
+  streak_count INTEGER DEFAULT 0,
+  email_verified BOOLEAN DEFAULT FALSE,
+  verification_token VARCHAR(255),
+  reset_token VARCHAR(255),
+  reset_token_expires_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+CREATE TABLE IF NOT EXISTS sessions (
+  id VARCHAR(128) PRIMARY KEY,
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  csrf_secret VARCHAR(64) NOT NULL,
+  ip_address VARCHAR(45),
+  user_agent TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  last_active_at TIMESTAMPTZ DEFAULT NOW(),
+  expires_at TIMESTAMPTZ NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS user_progress (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   lesson_id VARCHAR(100) NOT NULL,
   completed BOOLEAN DEFAULT FALSE,
   score INTEGER DEFAULT 0,
@@ -28,7 +44,8 @@ CREATE TABLE IF NOT EXISTS user_progress (
 
 CREATE TABLE IF NOT EXISTS vocabulary_items (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  language VARCHAR(10) DEFAULT 'en',
   term VARCHAR(255) NOT NULL,
   translation VARCHAR(255) NOT NULL,
   part_of_speech VARCHAR(50),
@@ -42,7 +59,7 @@ CREATE TABLE IF NOT EXISTS vocabulary_items (
 
 CREATE TABLE IF NOT EXISTS assessment_attempts (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   topic_id VARCHAR(100) NOT NULL,
   topic_title VARCHAR(255) NOT NULL,
   pronunciation_score INTEGER CHECK (pronunciation_score BETWEEN 0 AND 100),
@@ -57,7 +74,7 @@ CREATE TABLE IF NOT EXISTS assessment_attempts (
 
 CREATE TABLE IF NOT EXISTS conversation_sessions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   title VARCHAR(255) DEFAULT 'Conversational Practice',
   mode VARCHAR(50) DEFAULT 'free_conversation',
   started_at TIMESTAMPTZ DEFAULT NOW(),
@@ -66,7 +83,7 @@ CREATE TABLE IF NOT EXISTS conversation_sessions (
 
 CREATE TABLE IF NOT EXISTS conversation_messages (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  session_id UUID REFERENCES conversation_sessions(id) ON DELETE CASCADE,
+  session_id UUID NOT NULL REFERENCES conversation_sessions(id) ON DELETE CASCADE,
   sender VARCHAR(20) NOT NULL,
   content TEXT NOT NULL,
   translation TEXT,
@@ -76,7 +93,7 @@ CREATE TABLE IF NOT EXISTS conversation_messages (
 
 CREATE TABLE IF NOT EXISTS privacy_consents (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID REFERENCES users(id) ON DELETE CASCADE UNIQUE,
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE UNIQUE,
   store_transcripts BOOLEAN DEFAULT TRUE,
   store_audio_samples BOOLEAN DEFAULT FALSE,
   analytics_enabled BOOLEAN DEFAULT FALSE,
@@ -93,7 +110,7 @@ CREATE TABLE IF NOT EXISTS audit_logs (
 
 CREATE TABLE IF NOT EXISTS onboarding_profiles (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   answers JSONB NOT NULL,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
@@ -101,7 +118,7 @@ CREATE TABLE IF NOT EXISTS onboarding_profiles (
 
 CREATE TABLE IF NOT EXISTS personalized_curricula (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   curriculum_data JSONB NOT NULL,
   version VARCHAR(20) DEFAULT '1.0.0',
   is_active BOOLEAN DEFAULT TRUE,
@@ -110,7 +127,7 @@ CREATE TABLE IF NOT EXISTS personalized_curricula (
 
 CREATE TABLE IF NOT EXISTS mission_activity_logs (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   mission_id VARCHAR(100) NOT NULL,
   activity_type VARCHAR(50) NOT NULL,
   seconds_spent INTEGER NOT NULL,
@@ -119,6 +136,8 @@ CREATE TABLE IF NOT EXISTS mission_activity_logs (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id);
+CREATE INDEX IF NOT EXISTS idx_sessions_expires ON sessions(expires_at);
 CREATE INDEX IF NOT EXISTS idx_user_progress_user ON user_progress(user_id);
 CREATE INDEX IF NOT EXISTS idx_vocabulary_user ON vocabulary_items(user_id);
 CREATE INDEX IF NOT EXISTS idx_assessment_user ON assessment_attempts(user_id);

@@ -2,24 +2,48 @@ import React, { useState, useEffect } from 'react';
 import { Navbar } from './components/Navbar.tsx';
 import { DailyMissionHub } from './components/DailyMissionHub.tsx';
 import { VoiceSessionView } from './components/VoiceSessionView.tsx';
-import { CurriculumView } from './components/CurriculumView.tsx';
-import { TeachBackAssessmentView } from './components/TeachBackAssessmentView.tsx';
-import { VocabularyVaultView } from './components/VocabularyVaultView.tsx';
+import { LearnTabView } from './components/LearnTabView.tsx';
+import { ProgressTabView } from './components/ProgressTabView.tsx';
 import { DatabaseAdminView } from './components/DatabaseAdminView.tsx';
 import { OnboardingWizard } from './components/OnboardingWizard.tsx';
+import { SettingsModal } from './components/SettingsModal.tsx';
 import { apiClient, UserProfile } from './services/apiClient.ts';
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<string>('missions');
+  const [activeTab, setActiveTabState] = useState<string>('home');
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [curriculum, setCurriculum] = useState<any | null>(null);
   const [showOnboarding, setShowOnboarding] = useState<boolean>(false);
+  const [showSettings, setShowSettings] = useState<boolean>(false);
   const [onboardingAnswers, setOnboardingAnswers] = useState<any | null>(null);
-  const [dbStatus, setDbStatus] = useState<{ isLive: boolean; provider: string }>({
-    isLive: false,
-    provider: 'Local Cache Fallback'
-  });
+  const [voiceInitialLessonId, setVoiceInitialLessonId] = useState<string | undefined>(undefined);
+
+  // Synchronize activeTab with URL hash for browser history & deep linking
+  const setActiveTab = (tab: string) => {
+    setActiveTabState(tab);
+    if (typeof window !== 'undefined') {
+      window.location.hash = `#${tab}`;
+    }
+  };
+
+  useEffect(() => {
+    const handleHashChange = () => {
+      const hash = window.location.hash.replace('#', '').trim();
+      if (['home', 'talk', 'learn', 'progress', 'admin-db'].includes(hash)) {
+        setActiveTabState(hash);
+      } else if (hash === 'settings') {
+        setShowSettings(true);
+      } else {
+        // default to home
+        setActiveTabState('home');
+      }
+    };
+
+    handleHashChange();
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, []);
 
   // Sync theme with DOM and localStorage
   useEffect(() => {
@@ -49,39 +73,34 @@ export default function App() {
     }
   };
 
-  // Load profile, database health, onboarding, and personalized curriculum
+  // Load profile and personalized curriculum
   useEffect(() => {
     loadInitialData();
   }, []);
 
   const loadInitialData = async () => {
-    // Check cached profile first so user's selected language is immediately preserved
     let cachedProf: UserProfile | null = null;
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('luma_cached_profile');
       if (saved) {
-        try { cachedProf = JSON.parse(saved); } catch {}
+        try {
+          cachedProf = JSON.parse(saved);
+        } catch {}
       }
     }
     if (cachedProf) setProfile(cachedProf);
 
     try {
-      const [prof, health, onboardData, currData] = await Promise.all([
+      const [prof, onboardData, currData] = await Promise.all([
         apiClient.getProfile(),
-        apiClient.getDbHealth(),
         apiClient.getOnboarding().catch(() => null),
         apiClient.getPersonalizedCurriculum().catch(() => null)
       ]);
       const effectiveProf = cachedProf ? { ...prof, ...cachedProf } : prof;
       setProfile(effectiveProf);
-      setDbStatus({
-        isLive: health.database.isLive,
-        provider: health.database.provider
-      });
       setOnboardingAnswers(onboardData);
       setCurriculum(currData);
 
-      // If learner has never taken onboarding, open onboarding wizard
       if (!onboardData) {
         setShowOnboarding(true);
       }
@@ -91,18 +110,17 @@ export default function App() {
   };
 
   const handleUpdateProfile = async (updates: Partial<UserProfile>) => {
-    // 1. Immediately optimistically update profile state so UI updates instantaneously!
-    setProfile(prev => {
-      const next = prev ? { ...prev, ...updates } : {
-        id: 'usr_luma_default_001',
-        email: 'learner@luma.ai',
-        display_name: 'LUMA Learner',
-        target_language: updates.target_language || 'en',
-        bridge_language: updates.bridge_language || 'ta',
-        proficiency_level: 'B1',
-        daily_goal_minutes: 30,
-        streak_count: 5,
-        ...updates
+    setProfile((prev) => {
+      if (!prev) return null;
+      const next: UserProfile = {
+        ...prev,
+        ...updates,
+        displayName: updates.displayName || updates.display_name || prev.displayName,
+        display_name: updates.displayName || updates.display_name || prev.displayName,
+        targetLanguage: updates.targetLanguage || updates.target_language || prev.targetLanguage,
+        target_language: updates.targetLanguage || updates.target_language || prev.targetLanguage,
+        bridgeLanguage: updates.bridgeLanguage || updates.bridge_language || prev.bridgeLanguage,
+        bridge_language: updates.bridgeLanguage || updates.bridge_language || prev.bridgeLanguage
       };
       if (typeof window !== 'undefined') {
         localStorage.setItem('luma_cached_profile', JSON.stringify(next));
@@ -112,7 +130,7 @@ export default function App() {
 
     try {
       const updated = await apiClient.updateProfile(updates);
-      setProfile(prev => ({ ...(prev || {}), ...updated, ...updates }));
+      setProfile((prev) => ({ ...(prev || {}), ...updated, ...updates }));
       if (typeof window !== 'undefined') {
         localStorage.setItem('luma_cached_profile', JSON.stringify({ ...updated, ...updates }));
       }
@@ -121,20 +139,18 @@ export default function App() {
     }
   };
 
-  const [voiceInitialLessonId, setVoiceInitialLessonId] = useState<string | undefined>(undefined);
-
   const handleStartVoiceWithScenario = (lessonId: string) => {
     setVoiceInitialLessonId(lessonId);
-    setActiveTab('voice');
+    setActiveTab('talk');
   };
 
   const handleCompleteOnboarding = async (newCurriculum: any) => {
     setCurriculum(newCurriculum);
     setShowOnboarding(false);
-    setActiveTab('missions');
+    setActiveTab('home');
     try {
       const updatedProf = await apiClient.getProfile();
-      setProfile(prev => ({ ...(prev || {}), ...updatedProf }));
+      setProfile((prev) => ({ ...(prev || {}), ...updatedProf }));
       if (typeof window !== 'undefined') {
         localStorage.setItem('luma_cached_profile', JSON.stringify(updatedProf));
       }
@@ -150,13 +166,11 @@ export default function App() {
         theme={theme}
         setTheme={handleSetTheme}
         profile={profile}
-        onUpdateProfile={handleUpdateProfile}
-        dbStatus={dbStatus}
-        onOpenOnboarding={() => setShowOnboarding(true)}
+        onOpenSettings={() => setShowSettings(true)}
       />
 
-      {/* Main Tab Views */}
-      <main className="flex-1 pb-16">
+      {/* Main Tab Content */}
+      <main className="flex-1 pb-12" id="main-content">
         {showOnboarding ? (
           <OnboardingWizard
             theme={theme}
@@ -166,76 +180,97 @@ export default function App() {
           />
         ) : (
           <>
-            {activeTab === 'missions' && (
-              <DailyMissionHub
-                theme={theme}
-                curriculum={curriculum}
-                profile={profile}
-                onRetakeOnboarding={() => setShowOnboarding(true)}
-                onSwitchToVoiceTutor={() => setActiveTab('voice')}
-              />
+            {activeTab === 'home' && (
+              <div id="panel-home" role="tabpanel" aria-labelledby="tab-home">
+                <DailyMissionHub
+                  theme={theme}
+                  curriculum={curriculum}
+                  profile={profile}
+                  onRetakeOnboarding={() => setShowOnboarding(true)}
+                  onSwitchToVoiceTutor={() => setActiveTab('talk')}
+                />
+              </div>
             )}
 
-            {activeTab === 'voice' && (
-              <VoiceSessionView
-                profile={profile}
-                theme={theme}
-                initialLessonId={voiceInitialLessonId}
-                onNavigateTab={(tab) => setActiveTab(tab)}
-                onOpenOnboarding={() => setShowOnboarding(true)}
-                onToggleTheme={() => handleSetTheme(theme === 'dark' ? 'light' : 'dark')}
-                onUpdateProfile={handleUpdateProfile}
-              />
+            {activeTab === 'talk' && (
+              <div id="panel-talk" role="tabpanel" aria-labelledby="tab-talk">
+                <VoiceSessionView
+                  profile={profile}
+                  theme={theme}
+                  initialLessonId={voiceInitialLessonId}
+                  onNavigateTab={(tab) => setActiveTab(tab)}
+                  onOpenOnboarding={() => setShowOnboarding(true)}
+                  onToggleTheme={() => handleSetTheme(theme === 'dark' ? 'light' : 'dark')}
+                  onUpdateProfile={handleUpdateProfile}
+                />
+              </div>
             )}
 
-            {activeTab === 'curriculum' && (
-              <CurriculumView
-                profile={profile}
-                theme={theme}
-                onStartVoiceWithScenario={handleStartVoiceWithScenario}
-              />
+            {activeTab === 'learn' && (
+              <div id="panel-learn" role="tabpanel" aria-labelledby="tab-learn">
+                <LearnTabView
+                  profile={profile}
+                  theme={theme}
+                  onStartVoiceWithScenario={handleStartVoiceWithScenario}
+                />
+              </div>
             )}
 
-            {activeTab === 'assessment' && (
-              <TeachBackAssessmentView profile={profile} theme={theme} />
+            {activeTab === 'progress' && (
+              <div id="panel-progress" role="tabpanel" aria-labelledby="tab-progress">
+                <ProgressTabView profile={profile} theme={theme} />
+              </div>
             )}
 
-            {activeTab === 'vocabulary' && (
-              <VocabularyVaultView profile={profile} theme={theme} />
-            )}
-
-            {activeTab === 'database' && (
-              <DatabaseAdminView
-                profile={profile}
-                theme={theme}
-                onRefreshProfile={loadInitialData}
-              />
+            {activeTab === 'admin-db' && (
+              <div id="panel-admin-db" role="tabpanel" aria-label="Database Administration Console">
+                <DatabaseAdminView
+                  profile={profile}
+                  theme={theme}
+                  onRefreshProfile={loadInitialData}
+                />
+              </div>
             )}
           </>
         )}
       </main>
 
+      {/* Settings & Privacy Modal */}
+      <SettingsModal
+        isOpen={showSettings}
+        onClose={() => setShowSettings(false)}
+        profile={profile}
+        theme={theme}
+        onUpdateProfile={handleUpdateProfile}
+        onRetakeOnboarding={() => setShowOnboarding(true)}
+      />
+
       {/* Footer */}
       <footer
-        className="border-t py-6 text-center text-xs transition-colors duration-200"
+        className="border-t py-6 text-center text-xs transition-colors duration-200 mt-auto"
         style={{
           borderColor: theme === 'dark' ? '#263044' : '#E2E8F0',
           color: theme === 'dark' ? '#64748B' : '#94A3B8'
         }}
       >
-        <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
+        <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-3">
           <div className="flex items-center gap-2">
-            <span className="font-bold tracking-tight bg-gradient-aurora bg-clip-text text-transparent">
+            <span className="font-bold tracking-tight text-violet-400">
               LUMA
             </span>
             <span>— Find your voice. Think in a new language.</span>
           </div>
           <div className="flex items-center gap-4 text-[11px]">
-            <span>70/20/10 AI Curriculum</span>
+            <span>Personalized Practice</span>
             <span>•</span>
-            <span>Neon PostgreSQL Engine</span>
+            <span>PostgreSQL & Gemini</span>
             <span>•</span>
-            <span>Supernova Orb 3D</span>
+            <button
+              onClick={() => setActiveTab('admin-db')}
+              className="hover:underline text-slate-500 hover:text-slate-400 cursor-pointer"
+            >
+              System Health
+            </button>
           </div>
         </div>
       </footer>

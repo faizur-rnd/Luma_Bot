@@ -1,6 +1,6 @@
 # LUMA — Detailed Implementation Plan
 
-**Goal:** Transform the LUMA application into a production-grade, multi-platform language learning ecosystem powered by Aurora design tokens, Three.js Supernova Particle Orb, Neon Serverless PostgreSQL, and real-time AI speech processing.
+**Goal:** Transform the LUMA application into a production-grade, multi-platform language learning ecosystem powered by Aurora design tokens, Three.js voice orb Particle Orb, Neon Serverless PostgreSQL, and real-time AI speech processing.
 
 ---
 
@@ -11,7 +11,7 @@
 - Define gradients: Aurora Spectrum, Cosmic Pulse, Ocean Intelligence, Sunrise Energy, Mint Aurora.
 - Implement theme toggle provider with system preference detection and LocalStorage persistence.
 
-### Step 2: Three.js Supernova Particle Orb (`SupernovaOrb.tsx`)
+### Step 2: Three.js voice orb Particle Orb (`VoiceOrb.tsx`)
 - Particle point cloud using dynamic geometry attributes (1,800+ particles).
 - Organic mathematical wave displacement with per-vertex noise simulation.
 - Multi-spectral coloring using gradient interpolation between Cyan (`#22D3EE`), Violet (`#8B5CF6`), Magenta (`#D946EF`), and Coral (`#FB7185`).
@@ -38,7 +38,7 @@
 - Server-side Gemini API conversational tutor endpoint with real-time feedback, grammar hints, and bridge-language explanations.
 
 ### Step 5: Core Learning Journeys & Modules
-1. **Voice AI Conversation:** Real-time conversation with Supernova Orb visualization, instant grammar coaching, pronunciation guidance, and bridge language translations.
+1. **Voice AI Conversation:** Real-time conversation with Voice Orb visualization, instant grammar coaching, pronunciation guidance, and bridge language translations.
 2. **Curriculum Roadmap:** Progression through Beginner (A1), Elementary (A2), Intermediate (B1), Upper-Intermediate (B2), and Advanced (C1).
 3. **Real-World Missions:** High-stakes roleplay challenges (e.g., Airport Customs, Coffee Order, Software Architecture Job Interview, Medical Consultation).
 4. **Teach-Back Assessment:** Authoritative scoring across Pronunciation, Fluency, Grammar, and Lexical Resource with detailed feedback.

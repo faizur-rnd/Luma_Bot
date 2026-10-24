@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import { GoogleGenAI } from '@google/genai';
 import { getLanguageCapabilities } from './languageRegistry.ts';
 
@@ -77,6 +78,7 @@ export interface PersonalizedCurriculum {
   };
   remediationPlan: string[];
   generationSource: 'gemini_ai_custom' | 'approved_pedagogical_template';
+  reviewStatus: 'Draft, not yet reviewed';
   explanation: string;
 }
 
@@ -96,8 +98,9 @@ export function calculate70_20_10Allocation(dailyMinutes: number) {
 
 export async function generatePersonalizedCurriculum(
   answers: OnboardingAnswers,
-  userId = 'usr_luma_default_001'
+  userId?: string
 ): Promise<PersonalizedCurriculum> {
+  const resolvedUserId = userId || crypto.randomUUID();
   const allocation = calculate70_20_10Allocation(answers.q6_dailyMinutes || 30);
   const langCap = getLanguageCapabilities(answers.q1_nativeLanguage || 'ta');
   const targetLang = answers.q2_targetLanguage || 'en';
@@ -202,7 +205,7 @@ MANDATORY RULES:
       if (parsed) {
         return {
           id: `curr_${Date.now()}`,
-          userId,
+          userId: resolvedUserId,
           version: '1.0.0',
           createdAt: new Date().toISOString(),
           learnerProfile: answers,
@@ -221,6 +224,7 @@ MANDATORY RULES:
             'Spoken shadow repetition to improve syllable-timed rhythm.'
           ],
           generationSource: 'gemini_ai_custom',
+          reviewStatus: 'Draft, not yet reviewed',
           explanation: parsed.explanation || `Personalized ${targetLangCap.name} plan prioritizing spoken practice and rapid conversational recall.`
         };
       }
@@ -230,7 +234,7 @@ MANDATORY RULES:
   }
 
   // Approved Pedagogical Instant Fallback Template (< 200ms)
-  return generateApprovedTemplateCurriculum(answers, userId, allocation, langCap, targetLang);
+  return generateApprovedTemplateCurriculum(answers, resolvedUserId, allocation, langCap, targetLang);
 }
 
 function generateFallbackMissions(allocation: any, langCap: any, targetLang: string = 'en'): DailyMissionActivity[] {
@@ -764,6 +768,7 @@ function generateApprovedTemplateCurriculum(
     },
     remediationPlan,
     generationSource: 'approved_pedagogical_template',
+    reviewStatus: 'Draft, not yet reviewed',
     explanation: targetLang === 'ar'
       ? `خطة تعليمية منهجية معتمدة مخصصة لإتقان اللغة العربية الفصحى وفق جدول ${answers.q6_dailyMinutes} دقيقة يومياً وهدف ${answers.q7_targetMonths} أشهر.`
       : `Approved pedagogical framework tailored to learning ${targetCap.name} with your ${answers.q6_dailyMinutes}-minute daily schedule and ${answers.q7_targetMonths}-month milestone target.`
