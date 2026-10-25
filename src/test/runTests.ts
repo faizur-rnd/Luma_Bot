@@ -1,15 +1,26 @@
 import 'dotenv/config';
 import { runAllLumaTests } from './lumaSystem.test.ts';
 import { runSecurityTests } from './security.test.ts';
+import { runHttpApiTests } from './httpApi.test.ts';
+import { runLayoutTests } from './layout.test.ts';
 
 async function main() {
   console.log('--- Starting LUMA Automated System & Security Test Suite ---');
+  console.log('[1/4] Running system verification tests...');
   const sysResult = await runAllLumaTests();
+  console.log('[2/4] Running security hardening tests...');
   const secResults = await runSecurityTests();
+  console.log('[3/4] Running layout overlap prevention tests...');
+  const layoutResults = await runLayoutTests();
+  console.log('[4/4] Running HTTP API & health probe tests...');
+  const httpResults = await runHttpApiTests();
+  console.log('Completed all test suites. Compiling results...');
 
   const allResults = [
     ...sysResult.results,
-    ...secResults.map(r => ({ ...r, durationMs: 0 }))
+    ...secResults.map(r => ({ ...r, durationMs: 0 })),
+    ...layoutResults.map(r => ({ ...r, durationMs: 0 })),
+    ...httpResults.map(r => ({ ...r, durationMs: 0 }))
   ];
 
   const total = allResults.length;

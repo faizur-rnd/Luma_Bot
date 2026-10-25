@@ -107,30 +107,64 @@ export function csrfProtection(req: Request, res: Response, next: NextFunction) 
     return next();
   }
 
-  // Exempt public auth routes from CSRF token (they don't have a session yet)
-  const exemptPaths = ['/api/auth/login', '/api/auth/register', '/api/auth/forgot-password', '/api/auth/reset-password'];
-  if (exemptPaths.includes(req.path)) {
-    return next();
+  // Strict Origin / Referer check: Require Origin or Referer on state-changing requests
+  const originHeader = req.headers['origin'] || req.headers['referer'];
+  if (!originHeader) {
+    return res.status(403).json({
+      error: 'Missing Origin or Referer header for state-changing request.',
+      code: 'ORIGIN_REQUIRED',
+      requestId: req.requestId
+    });
   }
 
-  // Strict Origin / Referer check
-  const origin = req.headers['origin'] || req.headers['referer'];
+  const rawOrigin = Array.isArray(originHeader) ? originHeader[0] : originHeader;
   const host = req.headers['host'];
-  if (origin && host) {
-    try {
-      const originUrl = new URL(Array.isArray(origin) ? origin[0] : origin);
-      if (originUrl.host !== host && !originUrl.host.includes('localhost') && !originUrl.host.includes('127.0.0.1')) {
-        return res.status(403).json({
-          error: 'Cross-origin request rejected.',
-          requestId: req.requestId
-        });
-      }
-    } catch {
+
+  try {
+    const originUrl = new URL(rawOrigin);
+
+    // Exact allow-list configuration
+    const envAllowed = (process.env.ALLOWED_ORIGINS || '')
+      .split(',')
+      .map(o => o.trim())
+      .filter(Boolean);
+
+    const isSameHost = host && originUrl.host === host;
+    const isExplicitlyAllowed = envAllowed.includes(originUrl.origin);
+    const isDevLocalhost = process.env.NODE_ENV !== 'production' && (
+      originUrl.origin === 'http://localhost:3000' ||
+      originUrl.origin === 'http://127.0.0.1:3000' ||
+      originUrl.origin === 'http://localhost:5173' ||
+      originUrl.origin === 'http://127.0.0.1:5173' ||
+      originUrl.hostname === '127.0.0.1' ||
+      originUrl.hostname === 'localhost'
+    );
+
+    if (!isSameHost && !isExplicitlyAllowed && !isDevLocalhost) {
       return res.status(403).json({
-        error: 'Invalid request origin.',
+        error: 'Cross-origin request rejected.',
+        code: 'ORIGIN_FORBIDDEN',
         requestId: req.requestId
       });
     }
+  } catch {
+    return res.status(403).json({
+      error: 'Invalid request origin.',
+      code: 'INVALID_ORIGIN',
+      requestId: req.requestId
+    });
+  }
+
+  // Exempt public auth routes from CSRF token (they don't have a session yet)
+  const targetPath = (req.originalUrl ? req.originalUrl.split('?')[0] : req.path);
+  const exemptPaths = [
+    '/api/auth/login', '/auth/login',
+    '/api/auth/register', '/auth/register',
+    '/api/auth/forgot-password', '/auth/forgot-password',
+    '/api/auth/reset-password', '/auth/reset-password'
+  ];
+  if (exemptPaths.includes(targetPath) || exemptPaths.includes(req.path)) {
+    return next();
   }
 
   // Check CSRF token from header or body against current session

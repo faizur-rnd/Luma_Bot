@@ -1,129 +1,124 @@
 @import "tailwindcss";
 
-@layer base {
-  :root {
-    /* Brand Accent Colors */
-    --color-aurora-cyan: #22D3EE;
-    --color-electric-blue: #3B82F6;
-    --color-cosmic-violet: #8B5CF6;
-    --color-neon-magenta: #D946EF;
-    --color-aurora-pink: #F472B6;
-    --color-coral-pink: #FB7185;
-    --color-solar-orange: #FB923C;
-    --color-mint-green: #34D399;
+:root {
+  /* Design System Tokens: Light Theme (default) */
+  --bg: #F7F8FC;
+  --surface: #FFFFFF;
+  --surface-2: #EEF1FA;
+  --border: #E2E8F0;
+  --text: #0F172A;
+  --muted: #475569;
+  --accent: #4F5BD5;
+  --accent-hover: #434ebc;
+  --accent-contrast: #FFFFFF;
+  --success: #059669;
+  --warning: #B45309;
+  --danger: #DC2626;
 
-    /* Light Theme (Default when .light is active) */
-    --bg-main: #F8FAFC;
-    --bg-secondary: #F1F5F9;
-    --surface-card: #FFFFFF;
-    --surface-elevated: #FFFFFF;
-    --border-color: #E2E8F0;
-    --text-primary: #0F172A;
-    --text-secondary: #475569;
-    --text-muted: #64748B;
-    --action-primary: #6D28D9;
-    --action-focus: #7C3AED;
-    --semantic-success: #15803D;
-    --semantic-warning: #B45309;
-    --semantic-error: #B91C1C;
-    --semantic-info: #0369A1;
+  /* Typography scale */
+  --font-base: 16px;
+  --font-sm: 14px;
+  --font-h3: 20px;
+  --font-h2: 24px;
+  --font-h1: 32px;
+  --line-height: 1.5;
 
-    /* Gradients */
-    --gradient-aurora-spectrum: linear-gradient(135deg, #22D3EE 0%, #3B82F6 25%, #8B5CF6 50%, #D946EF 75%, #FB7185 100%);
-    --gradient-cosmic-pulse: linear-gradient(135deg, #8B5CF6 0%, #D946EF 50%, #FB7185 100%);
-    --gradient-ocean-intelligence: linear-gradient(135deg, #22D3EE 0%, #3B82F6 50%, #8B5CF6 100%);
-    --gradient-sunrise-energy: linear-gradient(135deg, #FB923C 0%, #FB7185 50%, #D946EF 100%);
-    --gradient-mint-aurora: linear-gradient(135deg, #34D399 0%, #22D3EE 50%, #3B82F6 100%);
-  }
+  /* Radii scale */
+  --radius-sm: 12px;
+  --radius-md: 16px;
+  --radius-lg: 24px;
 
-  /* Dark Theme */
-  .dark, [data-theme="dark"] {
-    --bg-main: #080B14;
-    --bg-secondary: #0D1220;
-    --surface-card: #111827;
-    --surface-elevated: #1E293B;
-    --border-color: #263044;
-    --text-primary: #F8FAFC;
-    --text-secondary: #CBD5E1;
-    --text-muted: #94A3B8;
-    --action-primary: #8B5CF6;
-    --action-focus: #A78BFA;
-    --semantic-success: #4ADE80;
-    --semantic-warning: #FBBF24;
-    --semantic-error: #F87171;
-    --semantic-info: #38BDF8;
-  }
+  /* Soft shadows */
+  --shadow-sm: 0 1px 3px 0 rgba(15, 23, 42, 0.04), 0 1px 2px -1px rgba(15, 23, 42, 0.04);
+  --shadow-md: 0 4px 20px -2px rgba(15, 23, 42, 0.06);
+  --shadow-lg: 0 10px 30px -5px rgba(15, 23, 42, 0.10);
+
+  /* Touch Target */
+  --touch-target: 44px;
+  --max-content-width: 960px;
+}
+
+.dark, [data-theme="dark"] {
+  /* Design System Tokens: Dark Theme */
+  --bg: #0B1020;
+  --surface: #121A30;
+  --surface-2: #1A2442;
+  --border: #26325A;
+  --text: #EAF0FF;
+  --muted: #9AA8CC;
+  --accent: #6C7BFF;
+  --accent-hover: #5A69FF;
+  --accent-contrast: #0B1020;
+  --success: #34D399;
+  --warning: #FBBF24;
+  --danger: #F87171;
+
+  --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 24px -2px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 10px 40px -5px rgba(0, 0, 0, 0.6);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  font-size: 16px;
+  line-height: 1.5;
+  background-color: var(--bg);
+  color: var(--text);
+  scroll-behavior: smooth;
 }
 
 body {
-  background-color: var(--bg-main);
-  color: var(--text-primary);
-  font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
-  transition: background-color 0.25s ease, color 0.25s ease;
+  margin: 0;
+  background-color: var(--bg);
+  color: var(--text);
+  font-size: 16px;
+  line-height: 1.5;
+  min-height: 100vh;
+  min-height: 100dvh;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
   overflow-x: hidden;
 }
 
-/* Gradient Utility Classes */
-.bg-gradient-aurora {
-  background: var(--gradient-aurora-spectrum);
+/* Typography enforce minimum 14px */
+body, button, input, textarea, select {
+  font-family: inherit;
+  font-size: 16px;
+  line-height: 1.5;
 }
 
-.bg-gradient-cosmic {
-  background: var(--gradient-cosmic-pulse);
+/* Reduced motion preference */
+@media (prefers-reduced-motion: reduce) {
+  *, ::before, ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
-.bg-gradient-ocean {
-  background: var(--gradient-ocean-intelligence);
+/* Focus styles for WCAG 2.2 AA visible focus ring */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
-.bg-gradient-sunrise {
-  background: var(--gradient-sunrise-energy);
-}
-
-.bg-gradient-mint {
-  background: var(--gradient-mint-aurora);
-}
-
-.text-gradient-aurora {
-  background: var(--gradient-aurora-spectrum);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-}
-
-.text-gradient-cosmic {
-  background: var(--gradient-cosmic-pulse);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-}
-
-/* Aurora Glow Filter Utilities */
-.aurora-glow-sm {
-  filter: drop-shadow(0 0 10px rgba(139, 92, 246, 0.35));
-}
-
-.aurora-glow-md {
-  filter: drop-shadow(0 0 20px rgba(34, 211, 238, 0.4)) drop-shadow(0 0 35px rgba(217, 70, 239, 0.3));
-}
-
-.aurora-glow-lg {
-  box-shadow: 0 0 50px -10px rgba(139, 92, 246, 0.5), 0 0 80px -20px rgba(34, 211, 238, 0.3);
-}
-
-/* Custom scrollbars */
+/* Custom Scrollbar */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 8px;
+  height: 8px;
 }
-
 ::-webkit-scrollbar-track {
-  background: transparent;
+  background: var(--bg);
 }
-
 ::-webkit-scrollbar-thumb {
-  background: var(--border-color);
+  background: var(--border);
   border-radius: 9999px;
 }
-
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--action-primary);
+  background: var(--muted);
 }

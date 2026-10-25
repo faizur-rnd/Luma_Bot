@@ -1,311 +1,247 @@
 import React, { useState } from 'react';
-import { 
-  X, 
-  ShieldCheck, 
-  Download, 
-  Trash2, 
-  Globe2, 
-  User, 
-  Lock, 
-  Check, 
-  AlertTriangle 
-} from 'lucide-react';
-import { apiClient, UserProfile } from '../services/apiClient.ts';
+import { Dialog, Button, Input, StatusPill } from './ui';
+import { apiClient, UserProfile } from '../services/apiClient';
 
 interface SettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
   profile: UserProfile | null;
   theme: 'dark' | 'light';
+  setTheme: (theme: 'dark' | 'light') => void;
   onUpdateProfile: (updates: Partial<UserProfile>) => void;
-  onRetakeOnboarding?: () => void;
+  onLogout?: () => void;
 }
+
+const LANGUAGES_SPOKEN = [
+  { code: 'en', name: 'English' },
+  { code: 'es', name: 'Spanish' },
+  { code: 'fr', name: 'French' },
+  { code: 'de', name: 'German' },
+  { code: 'ar', name: 'Arabic' },
+  { code: 'ta', name: 'Tamil' },
+  { code: 'hi', name: 'Hindi' }
+];
+
+const LANGUAGES_TO_LEARN = [
+  { code: 'es', name: 'Spanish' },
+  { code: 'fr', name: 'French' },
+  { code: 'de', name: 'German' },
+  { code: 'ja', name: 'Japanese' },
+  { code: 'en', name: 'English' }
+];
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({
   isOpen,
   onClose,
   profile,
   theme,
+  setTheme,
   onUpdateProfile,
-  onRetakeOnboarding
+  onLogout
 }) => {
-  const [activeTab, setActiveTab] = useState<'preferences' | 'privacy'>('preferences');
+  const [activeSection, setActiveSection] = useState<'settings' | 'privacy'>('settings');
+  const [displayName, setDisplayName] = useState(profile?.display_name || '');
+  const [spoken, setSpoken] = useState(profile?.bridge_language || 'en');
+  const [learning, setLearning] = useState(profile?.target_language || 'es');
+  const [isSaving, setIsSaving] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
-  const [isPurging, setIsPurging] = useState(false);
-  const [showPurgeConfirm, setShowPurgeConfirm] = useState(false);
-  const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
 
-  if (!isOpen) return null;
-
-  const targetLanguages = [
-    { code: 'en', label: 'English' },
-    { code: 'ar', label: 'العربية (Arabic)' },
-    { code: 'es', label: 'Español (Spanish)' },
-    { code: 'de', label: 'Deutsch (German)' }
-  ];
-
-  const bridgeLanguages = [
-    { code: 'en', label: 'English' },
-    { code: 'ta', label: 'தமிழ் (Tamil)' },
-    { code: 'hi', label: 'हिन्दी (Hindi)' },
-    { code: 'ar', label: 'العربية (Arabic)' },
-    { code: 'es', label: 'Español (Spanish)' },
-    { code: 'fr', label: 'Français (French)' },
-    { code: 'de', label: 'Deutsch (German)' }
-  ];
+  const handleSave = async () => {
+    setIsSaving(true);
+    setMsg(null);
+    try {
+      await onUpdateProfile({
+        display_name: displayName,
+        bridge_language: spoken,
+        target_language: learning
+      });
+      setMsg({ text: 'Settings updated successfully.', ok: true });
+    } catch {
+      setMsg({ text: 'Failed to save changes. Please try again.', ok: false });
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   const handleExportData = async () => {
     setIsExporting(true);
-    setStatusMessage(null);
     try {
       const data = await apiClient.exportUserData();
       const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `luma-user-data-${new Date().toISOString().split('T')[0]}.json`;
+      a.download = `luma-export-${new Date().toISOString().split('T')[0]}.json`;
       a.click();
       URL.revokeObjectURL(url);
-      setStatusMessage({ type: 'success', text: 'Data export downloaded successfully.' });
-    } catch (e: any) {
-      setStatusMessage({ type: 'error', text: e?.message || 'Failed to export data.' });
+      setMsg({ text: 'Data export downloaded.', ok: true });
+    } catch {
+      setMsg({ text: 'Failed to export data.', ok: false });
     } finally {
       setIsExporting(false);
     }
   };
 
-  const handlePurgeAccount = async () => {
-    setIsPurging(true);
-    setStatusMessage(null);
-    try {
-      await apiClient.purgeUserData();
-      setStatusMessage({ type: 'success', text: 'All account data permanently deleted. Reloading...' });
-      setTimeout(() => {
-        window.location.reload();
-      }, 1500);
-    } catch (e: any) {
-      setStatusMessage({ type: 'error', text: e?.message || 'Failed to delete account data.' });
-      setIsPurging(false);
-      setShowPurgeConfirm(false);
-    }
-  };
-
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="settings-dialog-title"
+    <Dialog
+      isOpen={isOpen}
+      onClose={onClose}
+      title={activeSection === 'settings' ? 'Settings & Preferences' : 'Privacy & Data'}
+      maxWidth="max-w-lg"
     >
-      <div
-        className="w-full max-w-lg rounded-2xl border shadow-2xl overflow-hidden flex flex-col"
-        style={{
-          backgroundColor: theme === 'dark' ? '#0F172A' : '#FFFFFF',
-          borderColor: theme === 'dark' ? '#334155' : '#E2E8F0'
-        }}
-      >
-        {/* Header */}
-        <div
-          className="p-4 border-b flex items-center justify-between"
-          style={{ borderColor: theme === 'dark' ? '#1E293B' : '#E2E8F0' }}
-        >
-          <div className="flex items-center gap-2">
-            <User className="w-5 h-5 text-violet-500" />
-            <h2 id="settings-dialog-title" className="font-bold text-base text-slate-900 dark:text-slate-100">
-              Settings & Privacy
-            </h2>
-          </div>
+      <div className="space-y-6">
+        {/* Navigation tabs between Settings and Privacy */}
+        <div className="flex border-b border-[var(--border)] gap-2 pb-2">
           <button
-            onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800/40 transition-colors"
-            aria-label="Close settings"
+            type="button"
+            onClick={() => { setActiveSection('settings'); setMsg(null); }}
+            className={`min-h-[44px] px-3 py-1.5 rounded-lg text-sm font-semibold transition-colors ${
+              activeSection === 'settings'
+                ? 'bg-[var(--surface-2)] text-[var(--text)] border border-[var(--border)]'
+                : 'text-[var(--muted)] hover:text-[var(--text)]'
+            }`}
           >
-            <X className="w-5 h-5" />
+            Preferences
+          </button>
+          <button
+            type="button"
+            onClick={() => { setActiveSection('privacy'); setMsg(null); }}
+            className={`min-h-[44px] px-3 py-1.5 rounded-lg text-sm font-semibold transition-colors ${
+              activeSection === 'privacy'
+                ? 'bg-[var(--surface-2)] text-[var(--text)] border border-[var(--border)]'
+                : 'text-[var(--muted)] hover:text-[var(--text)]'
+            }`}
+          >
+            Privacy & Data
           </button>
         </div>
 
-        {/* Tab switch */}
-        <div
-          className="flex border-b px-4 text-xs font-semibold"
-          style={{ borderColor: theme === 'dark' ? '#1E293B' : '#E2E8F0' }}
-        >
-          <button
-            onClick={() => setActiveTab('preferences')}
-            className={`py-3 px-3 border-b-2 transition-colors cursor-pointer ${
-              activeTab === 'preferences'
-                ? 'border-violet-500 text-violet-500'
-                : 'border-transparent text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            Languages & Learning
-          </button>
-          <button
-            onClick={() => setActiveTab('privacy')}
-            className={`py-3 px-3 border-b-2 transition-colors cursor-pointer ${
-              activeTab === 'privacy'
-                ? 'border-violet-500 text-violet-500'
-                : 'border-transparent text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            Privacy & GDPR
-          </button>
-        </div>
-
-        {/* Status notice */}
-        {statusMessage && (
+        {msg && (
           <div
-            className={`m-4 p-3 rounded-xl text-xs flex items-center gap-2 ${
-              statusMessage.type === 'success'
-                ? 'bg-emerald-500/10 border border-emerald-500/30 text-emerald-400'
-                : 'bg-rose-500/10 border border-rose-500/30 text-rose-400'
+            className={`p-3 rounded-xl text-sm ${
+              msg.ok ? 'bg-[var(--success)]/10 text-[var(--success)] border border-[var(--success)]/30' : 'bg-[var(--danger)]/10 text-[var(--danger)] border border-[var(--danger)]/30'
             }`}
+            role="status"
           >
-            {statusMessage.type === 'success' ? <Check className="w-4 h-4" /> : <AlertTriangle className="w-4 h-4" />}
-            <span>{statusMessage.text}</span>
+            {msg.text}
           </div>
         )}
 
-        {/* Body content */}
-        <div className="p-5 space-y-5 overflow-y-auto max-h-[70vh]">
-          {activeTab === 'preferences' && (
-            <>
-              {/* Language to learn */}
-              <div>
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                  Language to learn (Target Language)
-                </label>
-                <p className="text-[11px] text-slate-400 mb-2">
-                  The language you want to speak and practice with your voice tutor.
-                </p>
-                <select
-                  value={profile?.target_language || profile?.targetLanguage || 'en'}
-                  onChange={(e) => onUpdateProfile({ target_language: e.target.value })}
-                  className="w-full px-3 py-2 text-sm rounded-xl border bg-transparent text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-violet-500"
-                  style={{ borderColor: theme === 'dark' ? '#334155' : '#CBD5E1' }}
-                >
-                  {targetLanguages.map((l) => (
-                    <option key={l.code} value={l.code} className="bg-slate-900 text-white">
-                      {l.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
+        {activeSection === 'settings' ? (
+          <div className="space-y-4">
+            <Input
+              id="settings-display-name"
+              label="Your name"
+              value={displayName}
+              onChange={(e) => setDisplayName(e.target.value)}
+              placeholder="Learner name"
+            />
 
-              {/* Your native language */}
-              <div>
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                  Your language for explanations (Bridge Language)
-                </label>
-                <p className="text-[11px] text-slate-400 mb-2">
-                  Used when you need translations or explanations in your native tongue.
-                </p>
-                <select
-                  value={profile?.bridge_language || profile?.bridgeLanguage || 'ta'}
-                  onChange={(e) => onUpdateProfile({ bridge_language: e.target.value })}
-                  className="w-full px-3 py-2 text-sm rounded-xl border bg-transparent text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-violet-500"
-                  style={{ borderColor: theme === 'dark' ? '#334155' : '#CBD5E1' }}
-                >
-                  {bridgeLanguages.map((l) => (
-                    <option key={l.code} value={l.code} className="bg-slate-900 text-white">
-                      {l.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Retake Onboarding */}
-              {onRetakeOnboarding && (
-                <div className="pt-2">
-                  <button
-                    onClick={() => {
-                      onClose();
-                      onRetakeOnboarding();
-                    }}
-                    className="w-full py-2.5 px-4 rounded-xl border border-violet-500/40 bg-violet-500/10 text-violet-400 hover:bg-violet-500/20 text-xs font-semibold cursor-pointer transition-colors"
-                  >
-                    Retake 10-Question Learning Plan Assessment
-                  </button>
-                </div>
-              )}
-            </>
-          )}
-
-          {activeTab === 'privacy' && (
-            <div className="space-y-4">
-              <div className="p-3.5 rounded-xl border bg-slate-800/20 text-xs text-slate-400 space-y-1"
-                style={{ borderColor: theme === 'dark' ? '#1E293B' : '#E2E8F0' }}
+            <div>
+              <label htmlFor="settings-spoken" className="text-sm font-semibold text-[var(--text)] block mb-1">
+                Language you speak
+              </label>
+              <select
+                id="settings-spoken"
+                value={spoken}
+                onChange={(e) => setSpoken(e.target.value)}
+                className="w-full min-h-[44px] px-3 py-2 rounded-xl border border-[var(--border)] bg-[var(--surface)] text-[var(--text)] text-sm focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
               >
-                <span className="font-semibold text-slate-200 flex items-center gap-1.5">
-                  <ShieldCheck className="w-4 h-4 text-emerald-400" />
-                  Your Privacy & Data Rights
-                </span>
-                <p>
-                  LUMA stores only your practice records, words, and learning goals. You can download or completely delete your data at any time.
-                </p>
-              </div>
+                {LANGUAGES_SPOKEN.map((l) => (
+                  <option key={l.code} value={l.code}>{l.name}</option>
+                ))}
+              </select>
+            </div>
 
-              {/* Data Export */}
-              <div className="flex items-center justify-between p-3 rounded-xl border"
-                style={{ borderColor: theme === 'dark' ? '#1E293B' : '#E2E8F0' }}
+            <div>
+              <label htmlFor="settings-learning" className="text-sm font-semibold text-[var(--text)] block mb-1">
+                Language you want to learn
+              </label>
+              <select
+                id="settings-learning"
+                value={learning}
+                onChange={(e) => setLearning(e.target.value)}
+                className="w-full min-h-[44px] px-3 py-2 rounded-xl border border-[var(--border)] bg-[var(--surface)] text-[var(--text)] text-sm focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
               >
-                <div>
-                  <h4 className="text-xs font-bold text-slate-200">Export All My Data</h4>
-                  <p className="text-[11px] text-slate-400">Download a full JSON archive of your profile, vocab, and missions.</p>
-                </div>
-                <button
-                  onClick={handleExportData}
-                  disabled={isExporting}
-                  className="px-3 py-2 rounded-xl border border-violet-500/40 text-violet-400 hover:bg-violet-500/10 text-xs font-semibold flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                {LANGUAGES_TO_LEARN.map((l) => (
+                  <option key={l.code} value={l.code}>{l.name}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Theme switcher */}
+            <div>
+              <label className="text-sm font-semibold text-[var(--text)] block mb-2" id="theme-label">
+                Appearance
+              </label>
+              <div className="flex gap-2" role="radiogroup" aria-labelledby="theme-label">
+                <Button
+                  variant={theme === 'dark' ? 'primary' : 'secondary'}
+                  size="sm"
+                  onClick={() => setTheme('dark')}
+                  aria-pressed={theme === 'dark'}
                 >
-                  <Download className="w-3.5 h-3.5" />
-                  <span>{isExporting ? 'Exporting...' : 'Download'}</span>
-                </button>
-              </div>
-
-              {/* Data Purge */}
-              <div className="p-3 rounded-xl border border-rose-500/30 bg-rose-500/5 space-y-3">
-                <div>
-                  <h4 className="text-xs font-bold text-rose-400">Permanently Delete Account & Data</h4>
-                  <p className="text-[11px] text-slate-400">
-                    Immediately purges all user records, sessions, vocabulary cards, and logs. This cannot be undone.
-                  </p>
-                </div>
-
-                {!showPurgeConfirm ? (
-                  <button
-                    onClick={() => setShowPurgeConfirm(true)}
-                    className="px-3 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-semibold flex items-center gap-1.5 cursor-pointer"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                    <span>Delete My Account & Data</span>
-                  </button>
-                ) : (
-                  <div className="p-3 rounded-lg bg-rose-950/60 border border-rose-600/50 space-y-2">
-                    <p className="text-xs text-rose-300 font-semibold">
-                      Are you absolutely sure? All data will be permanently wiped.
-                    </p>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={handlePurgeAccount}
-                        disabled={isPurging}
-                        className="px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold cursor-pointer disabled:opacity-50"
-                      >
-                        {isPurging ? 'Deleting...' : 'Yes, Delete Everything'}
-                      </button>
-                      <button
-                        onClick={() => setShowPurgeConfirm(false)}
-                        className="px-3 py-1.5 rounded-lg border border-slate-600 text-slate-300 text-xs cursor-pointer hover:bg-slate-800"
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  </div>
-                )}
+                  Dark theme
+                </Button>
+                <Button
+                  variant={theme === 'light' ? 'primary' : 'secondary'}
+                  size="sm"
+                  onClick={() => setTheme('light')}
+                  aria-pressed={theme === 'light'}
+                >
+                  Light theme
+                </Button>
               </div>
             </div>
-          )}
-        </div>
+
+            <div className="pt-2">
+              <Button
+                variant="primary"
+                fullWidth
+                isLoading={isSaving}
+                onClick={handleSave}
+              >
+                Save changes
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <div className="p-4 rounded-xl border border-[var(--border)] bg-[var(--surface-2)] space-y-2">
+              <h4 className="text-sm font-bold text-[var(--text)]">Export your data</h4>
+              <p className="text-xs text-[var(--muted)]">
+                Download a full JSON archive of your practice history, speech logs, vocabulary, and profile data.
+              </p>
+              <Button
+                variant="secondary"
+                size="sm"
+                isLoading={isExporting}
+                onClick={handleExportData}
+              >
+                Download data export
+              </Button>
+            </div>
+
+            <div className="p-4 rounded-xl border border-[var(--danger)]/30 bg-[var(--surface-2)] space-y-2">
+              <h4 className="text-sm font-bold text-[var(--danger)]">Sign out</h4>
+              <p className="text-xs text-[var(--muted)]">
+                End your active session on this device.
+              </p>
+              {onLogout && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={onLogout}
+                  className="text-[var(--danger)] hover:bg-[var(--danger)]/10"
+                >
+                  Log out
+                </Button>
+              )}
+            </div>
+          </div>
+        )}
       </div>
-    </div>
+    </Dialog>
   );
 };

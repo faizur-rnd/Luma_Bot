@@ -1,279 +1,251 @@
-import React, { useState, useEffect } from 'react';
-import { Navbar } from './components/Navbar.tsx';
-import { DailyMissionHub } from './components/DailyMissionHub.tsx';
-import { VoiceSessionView } from './components/VoiceSessionView.tsx';
-import { LearnTabView } from './components/LearnTabView.tsx';
-import { ProgressTabView } from './components/ProgressTabView.tsx';
-import { DatabaseAdminView } from './components/DatabaseAdminView.tsx';
-import { OnboardingWizard } from './components/OnboardingWizard.tsx';
-import { SettingsModal } from './components/SettingsModal.tsx';
-import { apiClient, UserProfile } from './services/apiClient.ts';
+import React, { useState, useEffect, Suspense, lazy } from 'react';
+import { Navbar } from './components/Navbar';
+import { DailyMissionHub } from './components/DailyMissionHub';
+import { OfflineBanner, Skeleton } from './components/ui';
+import { apiClient, UserProfile } from './services/apiClient';
+
+const VoiceSessionView = lazy(() => import('./components/VoiceSessionView').then(m => ({ default: m.VoiceSessionView })));
+const LearnTabView = lazy(() => import('./components/LearnTabView').then(m => ({ default: m.LearnTabView })));
+const ProgressTabView = lazy(() => import('./components/ProgressTabView').then(m => ({ default: m.ProgressTabView })));
+const OnboardingWizard = lazy(() => import('./components/OnboardingWizard').then(m => ({ default: m.OnboardingWizard })));
+const SettingsModal = lazy(() => import('./components/SettingsModal').then(m => ({ default: m.SettingsModal })));
+
+type TabId = 'home' | 'talk' | 'learn' | 'progress';
+
+const TABS: { id: TabId; label: string; icon: string }[] = [
+  { id: 'home', label: 'Home', icon: '🏠' },
+  { id: 'talk', label: 'Talk', icon: '🎙️' },
+  { id: 'learn', label: 'Learn', icon: '📖' },
+  { id: 'progress', label: 'Progress', icon: '📈' }
+];
 
 export default function App() {
-  const [activeTab, setActiveTabState] = useState<string>('home');
+  const [activeTab, setActiveTabState] = useState<TabId>('home');
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [curriculum, setCurriculum] = useState<any | null>(null);
   const [showOnboarding, setShowOnboarding] = useState<boolean>(false);
   const [showSettings, setShowSettings] = useState<boolean>(false);
-  const [onboardingAnswers, setOnboardingAnswers] = useState<any | null>(null);
+  const [settingsSection, setSettingsSection] = useState<'settings' | 'privacy'>('settings');
   const [voiceInitialLessonId, setVoiceInitialLessonId] = useState<string | undefined>(undefined);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
 
-  // Synchronize activeTab with URL hash for browser history & deep linking
-  const setActiveTab = (tab: string) => {
+  // Router: sync tab with URL path (/home, /talk, /learn, /progress, /settings)
+  const navigateTo = (tab: TabId) => {
     setActiveTabState(tab);
     if (typeof window !== 'undefined') {
-      window.location.hash = `#${tab}`;
+      const targetPath = `/${tab}`;
+      if (window.location.pathname !== targetPath) {
+        window.history.pushState({ tab }, '', targetPath);
+      }
     }
   };
 
   useEffect(() => {
-    const handleHashChange = () => {
-      const hash = window.location.hash.replace('#', '').trim();
-      if (['home', 'talk', 'learn', 'progress', 'admin-db'].includes(hash)) {
-        setActiveTabState(hash);
-      } else if (hash === 'settings') {
+    const handlePopState = () => {
+      const path = window.location.pathname.replace(/^\//, '').split('/')[0] ||
+                   window.location.hash.replace(/^#\/?/, '').split('/')[0];
+      if (['home', 'talk', 'learn', 'progress'].includes(path)) {
+        setActiveTabState(path as TabId);
+      } else if (path === 'settings') {
         setShowSettings(true);
       } else {
-        // default to home
         setActiveTabState('home');
       }
     };
 
-    handleHashChange();
-    window.addEventListener('hashchange', handleHashChange);
-    return () => window.removeEventListener('hashchange', handleHashChange);
+    handlePopState();
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
-  // Sync theme with DOM and localStorage
+  // Theme setup: follow system if no preference, allow manual toggle
   useEffect(() => {
-    const savedTheme = localStorage.getItem('luma_theme') as 'dark' | 'light' | null;
-    const initialTheme = savedTheme || 'dark';
-    setTheme(initialTheme);
-    applyThemeToDOM(initialTheme);
+    const saved = localStorage.getItem('luma_theme') as 'dark' | 'light' | null;
+    const initial = saved || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+    applyTheme(initial);
   }, []);
 
-  const handleSetTheme = (newTheme: 'dark' | 'light') => {
-    setTheme(newTheme);
-    localStorage.setItem('luma_theme', newTheme);
-    applyThemeToDOM(newTheme);
+  const applyTheme = (t: 'dark' | 'light') => {
+    setTheme(t);
+    localStorage.setItem('luma_theme', t);
+    document.documentElement.setAttribute('data-theme', t);
+    document.documentElement.classList.toggle('dark', t === 'dark');
   };
 
-  const applyThemeToDOM = (t: 'dark' | 'light') => {
-    if (t === 'dark') {
-      document.documentElement.classList.add('dark');
-      document.documentElement.setAttribute('data-theme', 'dark');
-      document.body.style.backgroundColor = '#080B14';
-      document.body.style.color = '#F8FAFC';
-    } else {
-      document.documentElement.classList.remove('dark');
-      document.documentElement.setAttribute('data-theme', 'light');
-      document.body.style.backgroundColor = '#F8FAFC';
-      document.body.style.color = '#0F172A';
-    }
-  };
-
-  // Load profile and personalized curriculum
+  // Initial data load
   useEffect(() => {
-    loadInitialData();
-  }, []);
-
-  const loadInitialData = async () => {
-    let cachedProf: UserProfile | null = null;
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('luma_cached_profile');
-      if (saved) {
-        try {
-          cachedProf = JSON.parse(saved);
-        } catch {}
+    let active = true;
+    Promise.allSettled([
+      apiClient.getProfile(),
+      apiClient.getPersonalizedCurriculum()
+    ]).then(([profRes, currRes]) => {
+      if (!active) return;
+      if (profRes.status === 'fulfilled' && profRes.value) {
+        setProfile(profRes.value);
       }
-    }
-    if (cachedProf) setProfile(cachedProf);
-
-    try {
-      const [prof, onboardData, currData] = await Promise.all([
-        apiClient.getProfile(),
-        apiClient.getOnboarding().catch(() => null),
-        apiClient.getPersonalizedCurriculum().catch(() => null)
-      ]);
-      const effectiveProf = cachedProf ? { ...prof, ...cachedProf } : prof;
-      setProfile(effectiveProf);
-      setOnboardingAnswers(onboardData);
-      setCurriculum(currData);
-
-      if (!onboardData) {
-        setShowOnboarding(true);
+      if (currRes.status === 'fulfilled' && currRes.value) {
+        setCurriculum(currRes.value);
       }
-    } catch (e) {
-      console.warn('Initial data load completed in offline mode:', e);
-    }
-  };
-
-  const handleUpdateProfile = async (updates: Partial<UserProfile>) => {
-    setProfile((prev) => {
-      if (!prev) return null;
-      const next: UserProfile = {
-        ...prev,
-        ...updates,
-        displayName: updates.displayName || updates.display_name || prev.displayName,
-        display_name: updates.displayName || updates.display_name || prev.displayName,
-        targetLanguage: updates.targetLanguage || updates.target_language || prev.targetLanguage,
-        target_language: updates.targetLanguage || updates.target_language || prev.targetLanguage,
-        bridgeLanguage: updates.bridgeLanguage || updates.bridge_language || prev.bridgeLanguage,
-        bridge_language: updates.bridgeLanguage || updates.bridge_language || prev.bridgeLanguage
-      };
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('luma_cached_profile', JSON.stringify(next));
-      }
-      return next;
+      setIsLoading(false);
     });
 
+    return () => { active = false; };
+  }, []);
+
+  const handleUpdateProfile = async (updates: Partial<UserProfile>) => {
     try {
       const updated = await apiClient.updateProfile(updates);
       setProfile((prev) => ({ ...(prev || {}), ...updated, ...updates }));
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('luma_cached_profile', JSON.stringify({ ...updated, ...updates }));
-      }
-    } catch (e) {
-      console.error('Failed to update profile:', e);
+    } catch {
+      setProfile((prev) => (prev ? { ...prev, ...updates } : null));
     }
   };
 
-  const handleStartVoiceWithScenario = (lessonId: string) => {
+  const handleStartPracticeWithLesson = (lessonId?: string, topic?: string) => {
     setVoiceInitialLessonId(lessonId);
-    setActiveTab('talk');
+    navigateTo('talk');
   };
 
-  const handleCompleteOnboarding = async (newCurriculum: any) => {
-    setCurriculum(newCurriculum);
-    setShowOnboarding(false);
-    setActiveTab('home');
-    try {
-      const updatedProf = await apiClient.getProfile();
-      setProfile((prev) => ({ ...(prev || {}), ...updatedProf }));
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('luma_cached_profile', JSON.stringify(updatedProf));
-      }
-    } catch {}
+  const openSettingsModal = (section: 'settings' | 'privacy' = 'settings') => {
+    setSettingsSection(section);
+    setShowSettings(true);
   };
 
   return (
-    <div className="min-h-screen flex flex-col font-sans transition-colors duration-200">
-      {/* Navigation Header */}
+    <div className="min-h-screen flex flex-col bg-[var(--bg)] text-[var(--text)] transition-colors duration-200">
+      <OfflineBanner />
+
+      {/* Top Bar */}
       <Navbar
-        activeTab={activeTab}
-        setActiveTab={setActiveTab}
-        theme={theme}
-        setTheme={handleSetTheme}
         profile={profile}
-        onOpenSettings={() => setShowSettings(true)}
+        onOpenSettings={openSettingsModal}
+        theme={theme}
+        setTheme={applyTheme}
+        onNavigateHome={() => navigateTo('home')}
       />
 
-      {/* Main Tab Content */}
-      <main className="flex-1 pb-12" id="main-content">
-        {showOnboarding ? (
-          <OnboardingWizard
-            theme={theme}
-            existingAnswers={onboardingAnswers}
-            onComplete={handleCompleteOnboarding}
-            onCancel={() => setShowOnboarding(false)}
-          />
-        ) : (
-          <>
-            {activeTab === 'home' && (
-              <div id="panel-home" role="tabpanel" aria-labelledby="tab-home">
+      <div className="flex-1 flex max-w-[1200px] w-full mx-auto">
+        {/* Left Rail (Visible at >= 1024px) */}
+        <aside
+          className="hidden lg:flex flex-col w-60 border-r border-[var(--border)] py-6 px-4 space-y-1.5 shrink-0"
+          aria-label="Desktop primary navigation"
+        >
+          {TABS.map((tab) => {
+            const isActive = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => navigateTo(tab.id)}
+                className={`min-h-[44px] flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-semibold transition-all cursor-pointer ${
+                  isActive
+                    ? 'bg-[var(--surface-2)] text-[var(--accent)] border border-[var(--border)] shadow-xs'
+                    : 'text-[var(--muted)] hover:text-[var(--text)] hover:bg-[var(--surface)]'
+                }`}
+                aria-current={isActive ? 'page' : undefined}
+              >
+                <span className="text-lg" aria-hidden="true">{tab.icon}</span>
+                <span>{tab.label}</span>
+              </button>
+            );
+          })}
+        </aside>
+
+        {/* Main Content Area */}
+        <main className="flex-1 min-w-0 max-w-[960px] mx-auto w-full px-4 sm:px-6 py-6 pb-24 lg:pb-8" id="main-content">
+          {showOnboarding ? (
+            <Suspense fallback={<div className="space-y-4 pt-4"><Skeleton height={40} width={240} /><Skeleton height={180} /></div>}>
+              <OnboardingWizard
+                onComplete={() => {
+                  setShowOnboarding(false);
+                  navigateTo('home');
+                }}
+                onCancel={() => setShowOnboarding(false)}
+              />
+            </Suspense>
+          ) : isLoading ? (
+            <div className="space-y-6 pt-4">
+              <Skeleton height={40} width={240} />
+              <Skeleton height={200} />
+              <div className="grid grid-cols-2 gap-4">
+                <Skeleton height={96} />
+                <Skeleton height={96} />
+              </div>
+            </div>
+          ) : (
+            <Suspense fallback={<div className="space-y-4 pt-4"><Skeleton height={40} width={240} /><Skeleton height={180} /></div>}>
+              {activeTab === 'home' && (
                 <DailyMissionHub
-                  theme={theme}
                   curriculum={curriculum}
                   profile={profile}
                   onRetakeOnboarding={() => setShowOnboarding(true)}
-                  onSwitchToVoiceTutor={() => setActiveTab('talk')}
+                  onSwitchToVoiceTutor={() => navigateTo('talk')}
                 />
-              </div>
-            )}
+              )}
 
-            {activeTab === 'talk' && (
-              <div id="panel-talk" role="tabpanel" aria-labelledby="tab-talk">
+              {activeTab === 'talk' && (
                 <VoiceSessionView
                   profile={profile}
-                  theme={theme}
                   initialLessonId={voiceInitialLessonId}
-                  onNavigateTab={(tab) => setActiveTab(tab)}
-                  onOpenOnboarding={() => setShowOnboarding(true)}
-                  onToggleTheme={() => handleSetTheme(theme === 'dark' ? 'light' : 'dark')}
-                  onUpdateProfile={handleUpdateProfile}
+                  onNavigateTab={(tab) => navigateTo(tab as TabId)}
                 />
-              </div>
-            )}
+              )}
 
-            {activeTab === 'learn' && (
-              <div id="panel-learn" role="tabpanel" aria-labelledby="tab-learn">
+              {activeTab === 'learn' && (
                 <LearnTabView
                   profile={profile}
-                  theme={theme}
-                  onStartVoiceWithScenario={handleStartVoiceWithScenario}
+                  onStartPractice={handleStartPracticeWithLesson}
                 />
-              </div>
-            )}
+              )}
 
-            {activeTab === 'progress' && (
-              <div id="panel-progress" role="tabpanel" aria-labelledby="tab-progress">
-                <ProgressTabView profile={profile} theme={theme} />
-              </div>
-            )}
-
-            {activeTab === 'admin-db' && (
-              <div id="panel-admin-db" role="tabpanel" aria-label="Database Administration Console">
-                <DatabaseAdminView
+              {activeTab === 'progress' && (
+                <ProgressTabView
                   profile={profile}
-                  theme={theme}
-                  onRefreshProfile={loadInitialData}
                 />
-              </div>
-            )}
-          </>
-        )}
-      </main>
+              )}
+            </Suspense>
+          )}
+        </main>
+      </div>
 
-      {/* Settings & Privacy Modal */}
-      <SettingsModal
-        isOpen={showSettings}
-        onClose={() => setShowSettings(false)}
-        profile={profile}
-        theme={theme}
-        onUpdateProfile={handleUpdateProfile}
-        onRetakeOnboarding={() => setShowOnboarding(true)}
-      />
-
-      {/* Footer */}
-      <footer
-        className="border-t py-6 text-center text-xs transition-colors duration-200 mt-auto"
-        style={{
-          borderColor: theme === 'dark' ? '#263044' : '#E2E8F0',
-          color: theme === 'dark' ? '#64748B' : '#94A3B8'
-        }}
+      {/* Mobile Bottom Tab Bar (Hidden at >= 1024px) */}
+      <nav
+        className="lg:hidden fixed bottom-0 left-0 right-0 z-30 h-16 border-t border-[var(--border)] bg-[var(--surface)]/95 backdrop-blur-md flex items-center justify-around px-2"
+        aria-label="Mobile navigation bar"
       >
-        <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <span className="font-bold tracking-tight text-violet-400">
-              LUMA
-            </span>
-            <span>— Find your voice. Think in a new language.</span>
-          </div>
-          <div className="flex items-center gap-4 text-[11px]">
-            <span>Personalized Practice</span>
-            <span>•</span>
-            <span>PostgreSQL & Gemini</span>
-            <span>•</span>
+        {TABS.map((tab) => {
+          const isActive = activeTab === tab.id;
+          return (
             <button
-              onClick={() => setActiveTab('admin-db')}
-              className="hover:underline text-slate-500 hover:text-slate-400 cursor-pointer"
+              key={tab.id}
+              type="button"
+              onClick={() => navigateTo(tab.id)}
+              className={`min-h-[44px] min-w-[64px] flex flex-col items-center justify-center gap-0.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
+                isActive ? 'text-[var(--accent)]' : 'text-[var(--muted)] hover:text-[var(--text)]'
+              }`}
+              aria-current={isActive ? 'page' : undefined}
             >
-              System Health
+              <span className="text-lg leading-none" aria-hidden="true">{tab.icon}</span>
+              <span className="text-[11px] leading-tight font-medium">{tab.label}</span>
             </button>
-          </div>
-        </div>
-      </footer>
+          );
+        })}
+      </nav>
+
+      {/* Settings & Privacy Dialog */}
+      <Suspense fallback={null}>
+        {showSettings && (
+          <SettingsModal
+            isOpen={showSettings}
+            onClose={() => setShowSettings(false)}
+            profile={profile}
+            theme={theme}
+            setTheme={applyTheme}
+            onUpdateProfile={handleUpdateProfile}
+          />
+        )}
+      </Suspense>
     </div>
   );
 }

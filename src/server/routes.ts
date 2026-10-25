@@ -1,4 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
+import fs from 'fs';
+import path from 'path';
 import { z } from 'zod';
 import { db } from './db.ts';
 import { 
@@ -10,7 +12,12 @@ import {
   csrfProtection,
   SessionUser
 } from './auth.ts';
-import { generateLumaResponse, generateSpeechAudio } from './aiService.ts';
+import { 
+  generateLumaResponse, 
+  generateSpeechAudio, 
+  validateLearnerSpokenInput, 
+  scoreAssessmentSubmission 
+} from './aiService.ts';
 import { LANGUAGE_REGISTRY } from './languageRegistry.ts';
 import { generatePersonalizedCurriculum, OnboardingAnswers, calculate70_20_10Allocation } from './curriculumGenerator.ts';
 
@@ -73,11 +80,13 @@ const AssessmentSubmissionSchema = z.object({
   topic_title: z.string().max(255).optional(),
   transcribed_text: z.string().max(5000).optional(),
   user_voice_duration: z.number().min(0).max(3600).optional(),
+  timestamps: z.array(z.number()).optional(),
   pronunciation_score: z.number().min(0).max(100).optional(),
   fluency_score: z.number().min(0).max(100).optional(),
   grammar_score: z.number().min(0).max(100).optional(),
-  lexical_score: z.number().min(0).max(100).optional()
-}).strict();
+  lexical_score: z.number().min(0).max(100).optional(),
+  overall_score: z.number().min(0).max(100).optional()
+}).passthrough();
 
 const AiChatSchema = z.object({
   message: z.string().min(1).max(5000),
@@ -130,10 +139,29 @@ const COOKIE_OPTIONS = {
   maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
 };
 
+// Session Loader Middleware: Loads session & user from cookie before CSRF verification
+export async function sessionLoaderMiddleware(req: Request, res: Response, next: NextFunction) {
+  const sessionId = req.cookies?.[SESSION_COOKIE_NAME];
+  if (sessionId) {
+    const session = await db.findSession(sessionId);
+    if (session) {
+      req.session = session;
+      const user = await db.findUserById(session.userId);
+      if (user) {
+        req.user = user;
+      }
+    }
+  }
+  next();
+}
+
 // Authentication Middleware
 export async function requireAuth(req: Request, res: Response, next: NextFunction) {
-  const sessionId = req.cookies?.[SESSION_COOKIE_NAME];
-  if (!sessionId) {
+  if (!req.session || !req.user) {
+    const sessionId = req.cookies?.[SESSION_COOKIE_NAME];
+    if (sessionId) {
+      res.clearCookie(SESSION_COOKIE_NAME, { path: '/' });
+    }
     return res.status(401).json({
       error: 'Authentication required. Please sign in.',
       code: 'UNAUTHORIZED',
@@ -141,36 +169,13 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
     });
   }
 
-  const session = await db.findSession(sessionId);
-  if (!session) {
-    res.clearCookie(SESSION_COOKIE_NAME, { path: '/' });
-    return res.status(401).json({
-      error: 'Session expired or invalid. Please sign in again.',
-      code: 'SESSION_EXPIRED',
-      requestId: req.requestId
-    });
-  }
-
-  const user = await db.findUserById(session.userId);
-  if (!user) {
-    await db.destroySession(sessionId);
-    res.clearCookie(SESSION_COOKIE_NAME, { path: '/' });
-    return res.status(401).json({
-      error: 'User account not found.',
-      code: 'USER_NOT_FOUND',
-      requestId: req.requestId
-    });
-  }
-
   // Update session activity timestamp
-  await db.touchSession(sessionId);
-
-  req.user = user;
-  req.session = session;
+  await db.touchSession(req.session.id);
   next();
 }
 
-// Global CSRF Protection on mutating routes
+// Mount session loader first, followed by CSRF Protection on mutating routes
+router.use(sessionLoaderMiddleware);
 router.use(csrfProtection);
 
 // ==========================================
@@ -412,6 +417,27 @@ router.post('/auth/reset-password', async (req, res) => {
   }
 });
 
+// Versioned Curriculum Lessons (Public Catalog)
+router.get('/curriculum/lessons', async (req, res) => {
+  try {
+    const filePath = path.resolve(process.cwd(), 'src/content/curriculum/lessons.json');
+    if (fs.existsSync(filePath)) {
+      const content = fs.readFileSync(filePath, 'utf8');
+      const parsed = JSON.parse(content);
+      const allLessons = (parsed.modules || []).flatMap((m: any) => m.lessons || []);
+      return res.json({
+        version: parsed.version,
+        reviewStatus: parsed.reviewStatus,
+        modules: parsed.modules,
+        lessons: allLessons
+      });
+    }
+    res.status(404).json({ error: 'Curriculum content not found', requestId: req.requestId });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Failed to load curriculum content', requestId: req.requestId });
+  }
+});
+
 // ==========================================
 // Authenticated Learner Endpoints
 // All endpoints below require active session
@@ -474,10 +500,59 @@ router.get('/assessments', async (req, res) => {
 router.post('/assessments', async (req, res) => {
   try {
     const data = AssessmentSubmissionSchema.parse(req.body);
-    const assessment = await db.recordAssessment(req.user!.id, data);
-    res.json(assessment);
+    const transcribedText = (data.transcribed_text || '').trim();
+
+    // 1. Spoken input and gibberish validation (deterministic check)
+    const validation = validateLearnerSpokenInput(transcribedText);
+    if (!validation.valid) {
+      return res.status(400).json({
+        error: validation.reason,
+        code: 'INVALID_SPOKEN_INPUT',
+        requestId: req.requestId
+      });
+    }
+
+    // 2. Server-side scoring (client-sent scores are strictly ignored)
+    const scores = await scoreAssessmentSubmission({
+      text: transcribedText,
+      topicTitle: data.topic_title,
+      targetLanguage: req.user?.targetLanguage || 'en',
+      proficiencyLevel: req.user?.proficiencyLevel || 'B1',
+      userVoiceDuration: data.user_voice_duration,
+      timestamps: (data as any).timestamps
+    });
+
+    const assessment = await db.recordAssessment(req.user!.id, {
+      topic_id: data.topic_id || 'general',
+      topic_title: data.topic_title || 'Spoken Practice Assessment',
+      pronunciation_score: scores.pronunciation_score, // Always null (unsupported for text-only STT)
+      fluency_score: scores.fluency_score, // Number only if computed from real timestamps/duration, else null
+      grammar_score: scores.grammar_score,
+      lexical_score: scores.lexical_score,
+      overall_score: scores.overall_score,
+      coaching_feedback: scores.coaching_feedback,
+      transcribed_text: transcribedText
+    });
+
+    res.json({
+      ...assessment,
+      measured_metrics: scores.measured_metrics,
+      pronunciation_status: 'Not measured yet (text-only speech input)',
+      fluency_status: scores.fluency_score !== null ? 'Measured from speech rate' : 'Not measured yet'
+    });
   } catch (err: any) {
-    res.status(400).json({ error: 'Invalid assessment submission.', requestId: req.requestId });
+    if (err instanceof z.ZodError) {
+      return res.status(400).json({
+        error: 'Invalid assessment submission schema.',
+        details: err.issues.map(i => i.message),
+        requestId: req.requestId
+      });
+    }
+    res.status(400).json({
+      error: err.message || 'Invalid assessment submission.',
+      code: 'ASSESSMENT_SCORING_ERROR',
+      requestId: req.requestId
+    });
   }
 });
 

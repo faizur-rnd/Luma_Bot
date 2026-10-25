@@ -7,22 +7,18 @@ export interface MessageEntry {
   text: string;
   translation?: string;
   correction?: string;
-  pronunciationTip?: string;
-  isCurriculumRedirect?: boolean;
   timestamp: string;
 }
 
 interface ConversationTranscriptProps {
   messages: MessageEntry[];
   currentTranscript: string;
-  theme: 'dark' | 'light';
   onSpeakText?: (text: string) => void;
 }
 
 export const ConversationTranscript: React.FC<ConversationTranscriptProps> = ({
   messages,
   currentTranscript,
-  theme,
   onSpeakText
 }) => {
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -33,20 +29,22 @@ export const ConversationTranscript: React.FC<ConversationTranscriptProps> = ({
 
   return (
     <div
-      className="flex-1 overflow-y-auto p-4 space-y-4"
+      className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 min-h-0"
       role="log"
       aria-label="Conversation history"
+      aria-live="polite"
+      aria-relevant="additions"
     >
       {messages.length === 0 && !currentTranscript && (
-        <div className="h-full flex flex-col items-center justify-center text-center p-8 opacity-75">
-          <div className="w-12 h-12 rounded-2xl bg-violet-500/10 border border-violet-500/20 flex items-center justify-center mb-3">
-            <Sparkles className="w-6 h-6 text-violet-400" />
+        <div className="h-full flex flex-col items-center justify-center text-center p-8">
+          <div className="w-12 h-12 rounded-[16px] bg-[var(--surface-2)] text-[var(--accent)] flex items-center justify-center mb-3 shrink-0">
+            <Sparkles className="w-6 h-6" />
           </div>
-          <h3 className="text-base font-semibold text-slate-800 dark:text-slate-100">
+          <h3 className="text-[20px] font-bold text-[var(--text)] leading-[1.3]">
             Start talking with LUMA
           </h3>
-          <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm mt-1">
-            Tap the button below or start speaking. Ask questions, practice dialogues, or explain ideas.
+          <p className="text-[14px] text-[var(--muted)] max-w-sm mt-1 leading-[1.5]">
+            Tap the microphone button or type a message to start practicing.
           </p>
         </div>
       )}
@@ -59,62 +57,54 @@ export const ConversationTranscript: React.FC<ConversationTranscriptProps> = ({
             className={`flex flex-col ${isUser ? 'items-end' : 'items-start'}`}
           >
             <div
-              className={`max-w-[85%] sm:max-w-[78%] rounded-2xl px-4 py-3 shadow-sm text-sm ${
+              className={`max-w-[88%] sm:max-w-[80%] rounded-[16px] p-4 text-[16px] leading-[1.5] shadow-[var(--shadow-sm)] border ${
                 isUser
-                  ? 'bg-violet-600 text-white rounded-br-none'
-                  : theme === 'dark'
-                  ? 'bg-slate-800/90 text-slate-100 border border-slate-700/60 rounded-bl-none'
-                  : 'bg-white text-slate-900 border border-slate-200 rounded-bl-none shadow'
+                  ? 'bg-[var(--accent)] text-[var(--accent-contrast)] border-transparent rounded-br-[4px]'
+                  : 'bg-[var(--surface)] text-[var(--text)] border-[var(--border)] rounded-bl-[4px]'
               }`}
             >
-              {/* Message Content */}
               <div className="flex items-start justify-between gap-3">
-                <p className="leading-relaxed whitespace-pre-wrap">{msg.text}</p>
+                <p className="whitespace-pre-wrap">{msg.text}</p>
                 {!isUser && onSpeakText && (
                   <button
                     onClick={() => onSpeakText(msg.text)}
-                    className="p-1 rounded hover:bg-slate-700/30 text-slate-400 hover:text-slate-200 transition-colors shrink-0"
-                    title="Listen to this message"
-                    aria-label="Listen to message"
+                    className="min-h-[44px] min-w-[44px] p-2 rounded-[12px] text-[var(--muted)] hover:text-[var(--text)] hover:bg-[var(--surface-2)] transition-colors inline-flex items-center justify-center shrink-0"
+                    title="Repeat aloud"
+                    aria-label="Repeat aloud"
                   >
-                    <Volume2 className="w-4 h-4" />
+                    <Volume2 className="w-5 h-5" />
                   </button>
                 )}
               </div>
 
-              {/* Translation if available */}
               {msg.translation && (
-                <div className="mt-2 pt-2 border-t border-slate-700/40 text-xs text-slate-400 dark:text-slate-300 italic">
+                <div className="mt-2.5 pt-2.5 border-t border-[var(--border)] text-[14px] text-[var(--muted)] italic">
                   <span>Translation: {msg.translation}</span>
                 </div>
               )}
 
-              {/* Gentle Grammar/Vocabulary Correction */}
               {msg.correction && (
-                <div className="mt-2 p-2 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-xs text-emerald-400 flex items-start gap-1.5">
-                  <CheckCircle2 className="w-3.5 h-3.5 shrink-0 mt-0.5 text-emerald-400" />
+                <div className="mt-2.5 p-3 rounded-[12px] bg-[var(--success)]/10 border border-[var(--success)]/30 text-[14px] text-[var(--success)] flex items-start gap-2">
+                  <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" />
                   <div>
-                    <span className="font-semibold">Helpful tip: </span>
+                    <span className="font-semibold">Suggestion: </span>
                     <span>{msg.correction}</span>
                   </div>
                 </div>
               )}
             </div>
-
-            <span className="text-[10px] text-slate-400 mt-1 px-1">
+            <span className="text-[14px] text-[var(--muted)] px-1 mt-1">
               {msg.timestamp}
             </span>
           </div>
         );
       })}
 
-      {/* Real-time live transcript while user is speaking */}
       {currentTranscript && (
         <div className="flex flex-col items-end">
-          <div className="max-w-[85%] rounded-2xl px-4 py-2.5 bg-violet-600/30 border border-violet-500/50 text-slate-200 text-sm animate-pulse rounded-br-none">
-            <span className="italic">{currentTranscript}</span>
+          <div className="max-w-[88%] rounded-[16px] p-4 bg-[var(--accent)]/30 text-[var(--text)] border border-[var(--accent)]/50 rounded-br-[4px] animate-pulse text-[16px]">
+            <p className="italic">{currentTranscript}...</p>
           </div>
-          <span className="text-[10px] text-violet-400 mt-1">Speaking now...</span>
         </div>
       )}
 

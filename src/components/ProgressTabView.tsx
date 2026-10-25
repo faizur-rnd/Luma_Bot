@@ -1,110 +1,159 @@
 import React, { useState, useEffect } from 'react';
-import { Award, Flame, Clock, BarChart3 } from 'lucide-react';
-import { TeachBackAssessmentView } from './TeachBackAssessmentView.tsx';
-import { apiClient, UserProfile } from '../services/apiClient.ts';
+import { Card, StatusPill, Skeleton, EmptyState } from './ui';
+import { apiClient, UserProfile, AssessmentAttempt } from '../services/apiClient';
 
 interface ProgressTabViewProps {
   profile: UserProfile | null;
-  theme: 'dark' | 'light';
 }
 
-export const ProgressTabView: React.FC<ProgressTabViewProps> = ({ profile, theme }) => {
-  const [subTab, setSubTab] = useState<'explain' | 'overview'>('explain');
-  const [summary, setSummary] = useState<any | null>(null);
+export const ProgressTabView: React.FC<ProgressTabViewProps> = ({ profile }) => {
+  const [assessments, setAssessments] = useState<AssessmentAttempt[]>([]);
+  const [summary, setSummary] = useState<{ actual?: { speakingMinutes?: number; completedCount?: number } } | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    apiClient.getMissionsSummary().then(setSummary).catch(() => {});
+    let active = true;
+    Promise.allSettled([
+      apiClient.getAssessments(),
+      apiClient.getMissionsSummary()
+    ]).then(([assessmentsRes, summaryRes]) => {
+      if (!active) return;
+      if (assessmentsRes.status === 'fulfilled' && Array.isArray(assessmentsRes.value)) {
+        setAssessments(assessmentsRes.value);
+      }
+      if (summaryRes.status === 'fulfilled' && summaryRes.value) {
+        setSummary(summaryRes.value);
+      }
+      setLoading(false);
+    });
+
+    return () => { active = false; };
   }, []);
 
-  return (
-    <div className="max-w-6xl mx-auto px-4 py-4 space-y-4">
-      {/* Sub-navigation */}
-      <div className="flex items-center gap-2 border-b pb-3"
-        style={{ borderColor: theme === 'dark' ? '#263044' : '#E2E8F0' }}
-        role="tablist"
-        aria-label="Progress sub-navigation"
-      >
-        <button
-          role="tab"
-          aria-selected={subTab === 'explain'}
-          onClick={() => setSubTab('explain')}
-          className={`min-h-[44px] flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
-            subTab === 'explain'
-              ? 'bg-violet-600 text-white shadow-sm'
-              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-          }`}
-        >
-          <Award className="w-4 h-4" />
-          <span>Explain It Back</span>
-        </button>
+  const streak = profile?.streak_count || 0;
+  const minutesSpoken = summary?.actual?.speakingMinutes || 0;
+  const completedPractices = summary?.actual?.completedCount || assessments.length;
 
-        <button
-          role="tab"
-          aria-selected={subTab === 'overview'}
-          onClick={() => setSubTab('overview')}
-          className={`min-h-[44px] flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
-            subTab === 'overview'
-              ? 'bg-violet-600 text-white shadow-sm'
-              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-          }`}
-        >
-          <BarChart3 className="w-4 h-4" />
-          <span>Practice Overview</span>
-        </button>
+  return (
+    <div className="max-w-[960px] mx-auto px-4 py-6 space-y-8">
+      {/* Page Title */}
+      <div className="border-b border-[var(--border)] pb-4">
+        <h1 className="text-2xl font-bold text-[var(--text)] tracking-tight">Your Progress</h1>
+        <p className="text-sm text-[var(--muted)] mt-1">
+          Honest metrics grounded in verified practice sessions.
+        </p>
       </div>
 
-      {/* Content */}
-      <div>
-        {subTab === 'explain' ? (
-          <TeachBackAssessmentView profile={profile} theme={theme} />
-        ) : (
-          <div className="space-y-6">
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div className="p-5 rounded-2xl border bg-slate-900/30"
-                style={{ borderColor: theme === 'dark' ? '#1E293B' : '#E2E8F0' }}
-              >
-                <div className="flex items-center gap-2 text-orange-400 mb-2">
-                  <Flame className="w-5 h-5" />
-                  <span className="text-xs font-bold uppercase tracking-wider">Practice Streak</span>
-                </div>
-                <div className="text-3xl font-extrabold text-slate-100">
-                  {profile?.streak_count || 1} <span className="text-sm font-normal text-slate-400">consecutive days</span>
-                </div>
-                <p className="text-xs text-slate-500 mt-2">
-                  Incremented after verifying at least 3 minutes of practice today.
-                </p>
-              </div>
+      {/* Metrics Row */}
+      <div className="grid gap-4 sm:grid-cols-3">
+        {/* Streak */}
+        <Card className="flex flex-col justify-between">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm font-semibold text-[var(--muted)]">Practice streak</span>
+            <span className="text-xl" aria-hidden="true">🔥</span>
+          </div>
+          <div className="text-3xl font-extrabold text-[var(--text)]">
+            {loading ? <Skeleton height={36} width={60} /> : `${streak} ${streak === 1 ? 'day' : 'days'}`}
+          </div>
+          <p className="text-xs text-[var(--muted)] mt-2">
+            Counts consecutive days with at least 3 minutes of practice.
+          </p>
+        </Card>
 
-              <div className="p-5 rounded-2xl border bg-slate-900/30"
-                style={{ borderColor: theme === 'dark' ? '#1E293B' : '#E2E8F0' }}
-              >
-                <div className="flex items-center gap-2 text-violet-400 mb-2">
-                  <Clock className="w-5 h-5" />
-                  <span className="text-xs font-bold uppercase tracking-wider">Speaking Time</span>
-                </div>
-                <div className="text-3xl font-extrabold text-slate-100">
-                  {summary?.actual?.speakingMinutes || 0} <span className="text-sm font-normal text-slate-400">minutes</span>
-                </div>
-                <p className="text-xs text-slate-500 mt-2">
-                  Target: 70% of total practice duration.
-                </p>
-              </div>
+        {/* Minutes Spoken */}
+        <Card className="flex flex-col justify-between">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm font-semibold text-[var(--muted)]">Minutes spoken this week</span>
+            <span className="text-xl" aria-hidden="true">⏱️</span>
+          </div>
+          <div className="text-3xl font-extrabold text-[var(--text)]">
+            {loading ? <Skeleton height={36} width={60} /> : `${minutesSpoken} min`}
+          </div>
+          <p className="text-xs text-[var(--muted)] mt-2">
+            Logged across active conversational voice sessions.
+          </p>
+        </Card>
 
-              <div className="p-5 rounded-2xl border bg-slate-900/30"
-                style={{ borderColor: theme === 'dark' ? '#1E293B' : '#E2E8F0' }}
-              >
-                <div className="flex items-center gap-2 text-cyan-400 mb-2">
-                  <Award className="w-5 h-5" />
-                  <span className="text-xs font-bold uppercase tracking-wider">Curriculum Level</span>
-                </div>
-                <div className="text-3xl font-extrabold text-slate-100">
-                  {profile?.proficiencyLevel || profile?.proficiency_level || 'Intermediate'}
-                </div>
-                <p className="text-xs text-slate-500 mt-2">
-                  Lessons marked as Draft, not yet reviewed.
-                </p>
-              </div>
+        {/* Completed practices */}
+        <Card className="flex flex-col justify-between">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm font-semibold text-[var(--muted)]">Completed practices</span>
+            <span className="text-xl" aria-hidden="true">✅</span>
+          </div>
+          <div className="text-3xl font-extrabold text-[var(--text)]">
+            {loading ? <Skeleton height={36} width={60} /> : completedPractices}
+          </div>
+          <p className="text-xs text-[var(--muted)] mt-2">
+            Total conversational sessions and explain-backs.
+          </p>
+        </Card>
+      </div>
+
+      {/* Unmeasured metrics disclosure */}
+      <Card className="bg-[var(--surface-2)] border-[var(--border)]">
+        <h3 className="text-sm font-bold text-[var(--text)] mb-3">Measurement Disclosures</h3>
+        <div className="grid gap-3 sm:grid-cols-2 text-sm">
+          <div className="p-3 rounded-lg border border-[var(--border)] bg-[var(--surface)]">
+            <div className="flex justify-between items-center mb-1">
+              <span className="font-semibold text-[var(--text)]">Pronunciation</span>
+              <StatusPill label="Not measured yet" variant="neutral" />
             </div>
+            <p className="text-xs text-[var(--muted)]">
+              Browser speech recognition provides text transcripts only; acoustic scoring is not currently performed.
+            </p>
+          </div>
+          <div className="p-3 rounded-lg border border-[var(--border)] bg-[var(--surface)]">
+            <div className="flex justify-between items-center mb-1">
+              <span className="font-semibold text-[var(--text)]">Fluency certification</span>
+              <StatusPill label="Not measured yet" variant="neutral" />
+            </div>
+            <p className="text-xs text-[var(--muted)]">
+              Formal standardized certification requires proctored spoken testing.
+            </p>
+          </div>
+        </div>
+      </Card>
+
+      {/* Explain it back history */}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-bold text-[var(--text)]">Explain-it-back history</h2>
+          <span className="text-xs text-[var(--muted)]">{assessments.length} evaluated</span>
+        </div>
+
+        {loading ? (
+          <div className="space-y-3">
+            <Skeleton height={64} />
+            <Skeleton height={64} />
+          </div>
+        ) : assessments.length === 0 ? (
+          <EmptyState
+            title="No explain-it-back attempts yet"
+            description="Complete a practice session in the Learn tab to see your evaluations and feedback here."
+          />
+        ) : (
+          <div className="space-y-3">
+            {assessments.slice(0, 10).map((a) => (
+              <Card key={a.id} className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold text-[var(--text)]">
+                      {a.topic_title || 'Spoken Practice'}
+                    </span>
+                    <StatusPill
+                      label={`${a.overall_score || 0}/100`}
+                      variant={(a.overall_score || 0) >= 70 ? 'success' : 'warning'}
+                    />
+                  </div>
+                  <p className="text-xs text-[var(--muted)] line-clamp-1">
+                    {a.transcribed_text || 'Completed practice submission'}
+                  </p>
+                </div>
+                <div className="text-right text-xs text-[var(--muted)] whitespace-nowrap">
+                  {a.created_at ? new Date(a.created_at).toLocaleDateString() : 'Recent'}
+                </div>
+              </Card>
+            ))}
           </div>
         )}
       </div>

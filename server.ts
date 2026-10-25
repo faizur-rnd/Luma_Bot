@@ -5,7 +5,7 @@ import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
 import rateLimit from 'express-rate-limit';
 import apiRouter from './src/server/routes.ts';
-import { initDatabaseConnection } from './src/server/db.ts';
+import { initDatabaseConnection, db } from './src/server/db.ts';
 import { requestIdMiddleware } from './src/server/auth.ts';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -43,8 +43,8 @@ async function startServer() {
         directives: {
           defaultSrc: ["'self'"],
           scriptSrc: ["'self'", "'unsafe-inline'"], // unsafe-inline for Vite development script tags
-          styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
-          fontSrc: ["'self'", 'data:', 'https://fonts.gstatic.com'],
+          styleSrc: ["'self'", "'unsafe-inline'"],
+          fontSrc: ["'self'", 'data:'],
           imgSrc: ["'self'", 'data:', 'blob:', 'https:'],
           connectSrc: ["'self'", 'https://generativelanguage.googleapis.com', 'blob:', 'data:'],
           mediaSrc: ["'self'", 'blob:', 'data:'],
@@ -112,6 +112,31 @@ async function startServer() {
   });
   app.use('/api/ai', aiLimiter);
 
+  // Health and Readiness probes
+  app.get('/healthz', (_req, res) => {
+    res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
+  });
+
+  app.get('/readyz', async (_req, res) => {
+    const dbStatus = db.getStatus();
+    const hasGemini = Boolean(process.env.GEMINI_API_KEY && !process.env.GEMINI_API_KEY.includes('MY_GEMINI_API_KEY'));
+    const isReady = isProd ? (dbStatus.isLive && hasGemini) : true;
+
+    if (!isReady) {
+      return res.status(503).json({
+        status: 'degraded',
+        database: dbStatus,
+        aiConfigured: hasGemini
+      });
+    }
+
+    res.status(200).json({
+      status: 'ready',
+      database: dbStatus,
+      aiConfigured: hasGemini
+    });
+  });
+
   // Mount API Router
   app.use('/api', apiRouter);
 
@@ -130,8 +155,15 @@ async function startServer() {
     app.use(vite.middlewares);
   }
 
-  // Generic Error Handler (never leaks stack traces or err.message to clients)
+  // Error Handler (returns 400 for malformed JSON, never leaks stack traces or err.message to clients)
   app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+    if (err instanceof SyntaxError && 'status' in err && (err as any).status === 400) {
+      return res.status(400).json({
+        error: 'Malformed JSON payload.',
+        code: 'MALFORMED_JSON',
+        requestId: (req as any).requestId
+      });
+    }
     console.error(`[UNHANDLED ERROR] [${req.requestId}]`, err);
     res.status(500).json({
       error: 'An internal server error occurred.',

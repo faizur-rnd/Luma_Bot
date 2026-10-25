@@ -1,69 +1,52 @@
 import React, { useState } from 'react';
-import { BookOpen, Layers } from 'lucide-react';
-import { CurriculumView } from './CurriculumView.tsx';
-import { VocabularyVaultView } from './VocabularyVaultView.tsx';
-import { UserProfile } from '../services/apiClient.ts';
+import { Tabs } from './ui';
+import { LessonsListView } from './learn/LessonsListView';
+import { MyWordsView } from './learn/MyWordsView';
+import { ExplainItBackView } from './learn/ExplainItBackView';
+import { UserProfile } from '../services/apiClient';
 
 interface LearnTabViewProps {
   profile: UserProfile | null;
-  theme: 'dark' | 'light';
-  onStartVoiceWithScenario: (lessonId: string) => void;
+  onStartPractice: (lessonId?: string, topic?: string) => void;
 }
 
 export const LearnTabView: React.FC<LearnTabViewProps> = ({
   profile,
-  theme,
-  onStartVoiceWithScenario
+  onStartPractice
 }) => {
-  const [subTab, setSubTab] = useState<'lessons' | 'words'>('lessons');
+  const [activeTab, setActiveTab] = useState<'lessons' | 'words' | 'explain'>('lessons');
+
+  const tabs = [
+    { id: 'lessons', label: 'Lessons' },
+    { id: 'words', label: 'My words' },
+    { id: 'explain', label: 'Explain it back' }
+  ];
 
   return (
-    <div className="max-w-6xl mx-auto px-4 py-4 space-y-4">
-      {/* Sub-navigation */}
-      <div className="flex items-center gap-2 border-b pb-3"
-        style={{ borderColor: theme === 'dark' ? '#263044' : '#E2E8F0' }}
-        role="tablist"
-        aria-label="Learn sub-navigation"
-      >
-        <button
-          role="tab"
-          aria-selected={subTab === 'lessons'}
-          onClick={() => setSubTab('lessons')}
-          className={`min-h-[44px] flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
-            subTab === 'lessons'
-              ? 'bg-violet-600 text-white shadow-sm'
-              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-          }`}
-        >
-          <BookOpen className="w-4 h-4" />
-          <span>Curriculum Lessons</span>
-        </button>
-
-        <button
-          role="tab"
-          aria-selected={subTab === 'words'}
-          onClick={() => setSubTab('words')}
-          className={`min-h-[44px] flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
-            subTab === 'words'
-              ? 'bg-violet-600 text-white shadow-sm'
-              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-          }`}
-        >
-          <Layers className="w-4 h-4" />
-          <span>My Words</span>
-        </button>
+    <div className="max-w-[960px] mx-auto px-4 py-6 space-y-6">
+      <div className="border-b border-[var(--border)] pb-4">
+        <h1 className="text-2xl font-bold text-[var(--text)] tracking-tight">Learn</h1>
+        <p className="text-sm text-[var(--muted)] mt-1">
+          Structured modules, active recall flashcards, and conceptual explain-backs.
+        </p>
       </div>
 
-      {/* Content */}
-      <div>
-        {subTab === 'lessons' ? (
-          <CurriculumView
-            profile={profile}
-            theme={theme}
-            onStartVoiceWithScenario={onStartVoiceWithScenario}
-          />
-        ) : (
-          <VocabularyVaultView profile={profile} theme={theme} />
+      <Tabs
+        tabs={tabs}
+        activeTab={activeTab}
+        onChange={(id) => setActiveTab(id as 'lessons' | 'words' | 'explain')}
+        ariaLabel="Learn navigation tabs"
+      />
+
+      <div className="mt-6">
+        {activeTab === 'lessons' && (
+          <LessonsListView onStartLesson={(lessonId: string, topic: string) => onStartPractice(lessonId, topic)} />
+        )}
+        {activeTab === 'words' && (
+          <MyWordsView profile={profile} />
+        )}
+        {activeTab === 'explain' && (
+          <ExplainItBackView profile={profile} />
         )}
       </div>
     </div>

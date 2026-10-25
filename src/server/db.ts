@@ -106,11 +106,19 @@ export async function runMigrations(): Promise<{ success: boolean; message: stri
   }
 }
 
+function handleDbError(err: any, operationName: string) {
+  if (process.env.NODE_ENV === 'production') {
+    console.error(`[DB Error in production] Operation '${operationName}' failed:`, err);
+    throw new Error(`Database error during ${operationName}: ${err?.message || 'Query failed'}`);
+  }
+  console.warn(`[DB Dev Fallback] Database operation '${operationName}' failed, falling back to LocalStore:`, err?.message || err);
+}
+
 export const db = {
   isLive: () => isConnectedToLiveDb,
   getStatus: () => ({
     isLive: isConnectedToLiveDb,
-    provider: isConnectedToLiveDb ? 'Neon Serverless PostgreSQL' : 'Resilient LocalStore (Non-Production Development Mode)',
+    provider: isConnectedToLiveDb ? 'Neon Serverless PostgreSQL' : 'LocalStore (Development in-memory fallback, not for production)',
     error: dbErrorDetail,
     hasConnectionString: Boolean(process.env.DATABASE_URL && !process.env.DATABASE_URL.includes('ep-project-id'))
   }),
@@ -142,7 +150,9 @@ export const db = {
           };
         }
         return null;
-      } catch (e) {}
+      } catch (e) {
+        handleDbError(e, 'findUserByEmail');
+      }
     }
 
     const userId = memDb.usersByEmail.get(normalized);
@@ -169,7 +179,9 @@ export const db = {
           };
         }
         return null;
-      } catch (e) {}
+      } catch (e) {
+        handleDbError(e, 'findUserById');
+      }
     }
 
     const user = memDb.users.get(id);
@@ -227,7 +239,9 @@ export const db = {
           dailyGoalMinutes: row.daily_goal_minutes,
           streakCount: row.streak_count
         };
-      } catch (e) {}
+      } catch (e) {
+        handleDbError(e, 'createUser');
+      }
     }
 
     memDb.users.set(id, {
@@ -276,7 +290,9 @@ export const db = {
             streakCount: row.streak_count
           };
         }
-      } catch (e) {}
+      } catch (e) {
+        handleDbError(e, 'updateUserProfile');
+      }
     }
 
     const existing = memDb.users.get(userId);
@@ -312,7 +328,9 @@ export const db = {
           [token, new Date(expiresAt).toISOString(), userId]
         );
         return;
-      } catch (e) {}
+      } catch (e) {
+        handleDbError(e, 'savePasswordResetToken');
+      }
     }
     const user = memDb.users.get(userId);
     if (user) {
@@ -329,7 +347,9 @@ export const db = {
           [newPasswordHash, token]
         );
         return res.rowCount !== null && res.rowCount > 0;
-      } catch (e) {}
+      } catch (e) {
+        handleDbError(e, 'resetPassword');
+      }
     }
 
     for (const [id, user] of memDb.users.entries()) {
@@ -367,7 +387,9 @@ export const db = {
           [sessionId, userId, csrfSecret, ip || null, userAgent || null, new Date(session.expiresAt).toISOString()]
         );
         return session;
-      } catch (e) {}
+      } catch (e) {
+        handleDbError(e, 'createSession');
+      }
     }
 
     memDb.sessions.set(sessionId, session);
@@ -399,7 +421,9 @@ export const db = {
           };
         }
         return null;
-      } catch (e) {}
+      } catch (e) {
+        handleDbError(e, 'findSession');
+      }
     }
 
     const session = memDb.sessions.get(sessionId);
@@ -417,7 +441,9 @@ export const db = {
       try {
         await pool.query('UPDATE sessions SET last_active_at = NOW() WHERE id = $1', [sessionId]);
         return;
-      } catch (e) {}
+      } catch (e) {
+        handleDbError(e, 'touchSession');
+      }
     }
     const session = memDb.sessions.get(sessionId);
     if (session) {
@@ -430,7 +456,9 @@ export const db = {
       try {
         await pool.query('DELETE FROM sessions WHERE id = $1', [sessionId]);
         return;
-      } catch (e) {}
+      } catch (e) {
+        handleDbError(e, 'destroySession');
+      }
     }
     memDb.sessions.delete(sessionId);
   },
@@ -440,7 +468,9 @@ export const db = {
       try {
         await pool.query('DELETE FROM sessions WHERE user_id = $1', [userId]);
         return;
-      } catch (e) {}
+      } catch (e) {
+        handleDbError(e, 'destroyAllUserSessions');
+      }
     }
     for (const [id, session] of memDb.sessions.entries()) {
       if (session.userId === userId) {
@@ -459,7 +489,9 @@ export const db = {
         const progressMap: Record<string, any> = {};
         res.rows.forEach(r => { progressMap[r.lesson_id] = r; });
         return progressMap;
-      } catch (e) {}
+      } catch (e) {
+        handleDbError(e, 'getProgress');
+      }
     }
 
     const userProg = memDb.progress.get(userId);
@@ -492,7 +524,9 @@ export const db = {
           [userId, lessonId, completed, score, timeSpent]
         );
         return record;
-      } catch (e) {}
+      } catch (e) {
+        handleDbError(e, 'recordLessonProgress');
+      }
     }
 
     if (!memDb.progress.has(userId)) {
@@ -522,7 +556,9 @@ export const db = {
       try {
         const res = await pool.query('SELECT * FROM vocabulary_items WHERE user_id = $1 ORDER BY mastery_level ASC', [userId]);
         return res.rows;
-      } catch (e) {}
+      } catch (e) {
+        handleDbError(e, 'getVocabulary');
+      }
     }
     return memDb.vocabulary.get(userId) || [];
   },
@@ -552,7 +588,9 @@ export const db = {
           [item.id, userId, item.language, item.term, item.translation, item.part_of_speech, item.phonetic, item.context_example, item.mastery_level, item.leitner_box, item.next_review_at]
         );
         return item;
-      } catch (e) {}
+      } catch (e) {
+        handleDbError(e, 'addOrUpdateVocabulary');
+      }
     }
 
     if (!memDb.vocabulary.has(userId)) {
@@ -576,7 +614,9 @@ export const db = {
       try {
         const res = await pool.query('SELECT * FROM assessment_attempts WHERE user_id = $1 ORDER BY created_at DESC', [userId]);
         return res.rows;
-      } catch (e) {}
+      } catch (e) {
+        handleDbError(e, 'getAssessments');
+      }
     }
     return memDb.assessments.get(userId) || [];
   },
@@ -587,16 +627,11 @@ export const db = {
       user_id: userId,
       topic_id: assessmentData.topic_id || 'general',
       topic_title: assessmentData.topic_title || 'Spoken Practice Assessment',
-      pronunciation_score: assessmentData.pronunciation_score ?? 80,
-      fluency_score: assessmentData.fluency_score ?? 80,
-      grammar_score: assessmentData.grammar_score ?? 80,
-      lexical_score: assessmentData.lexical_score ?? 80,
-      overall_score: assessmentData.overall_score ?? Math.round(
-        ((assessmentData.pronunciation_score ?? 80) +
-         (assessmentData.fluency_score ?? 80) +
-         (assessmentData.grammar_score ?? 80) +
-         (assessmentData.lexical_score ?? 80)) / 4
-      ),
+      pronunciation_score: assessmentData.pronunciation_score ?? null,
+      fluency_score: assessmentData.fluency_score ?? null,
+      grammar_score: assessmentData.grammar_score ?? null,
+      lexical_score: assessmentData.lexical_score ?? null,
+      overall_score: assessmentData.overall_score ?? null,
       coaching_feedback: assessmentData.coaching_feedback || 'Keep practicing conversational flow.',
       transcribed_text: assessmentData.transcribed_text || '',
       created_at: new Date().toISOString()
@@ -610,7 +645,9 @@ export const db = {
           [item.id, userId, item.topic_id, item.topic_title, item.pronunciation_score, item.fluency_score, item.grammar_score, item.lexical_score, item.overall_score, item.coaching_feedback, item.transcribed_text]
         );
         return item;
-      } catch (e) {}
+      } catch (e) {
+        handleDbError(e, 'recordAssessment');
+      }
     }
 
     if (!memDb.assessments.has(userId)) {
@@ -660,7 +697,9 @@ export const db = {
       try {
         const res = await pool.query('SELECT answers FROM onboarding_profiles WHERE user_id = $1 ORDER BY updated_at DESC LIMIT 1', [userId]);
         if (res.rows.length > 0) return res.rows[0].answers;
-      } catch (e) {}
+      } catch (e) {
+        handleDbError(e, 'getOnboarding');
+      }
     }
     return memDb.onboarding.get(userId) || null;
   },
@@ -674,7 +713,9 @@ export const db = {
           [userId, JSON.stringify(answers)]
         );
         return answers;
-      } catch (e) {}
+      } catch (e) {
+        handleDbError(e, 'saveOnboarding');
+      }
     }
     memDb.onboarding.set(userId, answers);
     return answers;
@@ -688,7 +729,9 @@ export const db = {
       try {
         const res = await pool.query('SELECT curriculum_data FROM personalized_curricula WHERE user_id = $1 AND is_active = TRUE ORDER BY created_at DESC LIMIT 1', [userId]);
         if (res.rows.length > 0) return res.rows[0].curriculum_data;
-      } catch (e) {}
+      } catch (e) {
+        handleDbError(e, 'getPersonalizedCurriculum');
+      }
     }
     return memDb.curricula.get(userId) || null;
   },
@@ -703,7 +746,9 @@ export const db = {
           [userId, JSON.stringify(curriculum)]
         );
         return curriculum;
-      } catch (e) {}
+      } catch (e) {
+        handleDbError(e, 'savePersonalizedCurriculum');
+      }
     }
     memDb.curricula.set(userId, curriculum);
     return curriculum;
@@ -731,7 +776,9 @@ export const db = {
           [entry.id, userId, log.missionId, log.activityType, log.secondsSpent, log.score ?? null]
         );
         return entry;
-      } catch (e) {}
+      } catch (e) {
+        handleDbError(e, 'recordMissionActivity');
+      }
     }
 
     if (!memDb.missionLogs.has(userId)) {
@@ -746,7 +793,9 @@ export const db = {
       try {
         const res = await pool.query('SELECT * FROM mission_activity_logs WHERE user_id = $1 ORDER BY created_at DESC', [userId]);
         return res.rows;
-      } catch (e) {}
+      } catch (e) {
+        handleDbError(e, 'getMissionLogs');
+      }
     }
     return memDb.missionLogs.get(userId) || [];
   },
@@ -759,7 +808,9 @@ export const db = {
       try {
         const res = await pool.query('SELECT * FROM privacy_consents WHERE user_id = $1 LIMIT 1', [userId]);
         if (res.rows.length > 0) return res.rows[0];
-      } catch (e) {}
+      } catch (e) {
+        handleDbError(e, 'getPrivacyConsents');
+      }
     }
     return memDb.consents.get(userId) || {
       store_transcripts: true,
@@ -790,7 +841,9 @@ export const db = {
           [userId, record.store_transcripts, record.store_audio_samples, record.analytics_enabled]
         );
         return record;
-      } catch (e) {}
+      } catch (e) {
+        handleDbError(e, 'updatePrivacyConsents');
+      }
     }
 
     memDb.consents.set(userId, record);

@@ -1,15 +1,16 @@
-import React from 'react';
-import { Mic, MicOff, Volume2, VolumeX, Send } from 'lucide-react';
-import { VoiceSessionState } from '../VoiceOrb.tsx';
+import React, { useState } from 'react';
+import { Mic, MicOff, MessageSquare, Send, RotateCcw, Gauge } from 'lucide-react';
+import { VoiceSessionState } from '../orb/types.ts';
+import { Button } from '../ui/Button.tsx';
 
 interface VoiceControlsProps {
   orbState: VoiceSessionState;
   isListening: boolean;
-  isMuted: boolean;
+  isSlowerSpeech: boolean;
   textInput: string;
-  theme: 'dark' | 'light';
   onToggleMic: () => void;
-  onToggleMute: () => void;
+  onRepeatLastReply: () => void;
+  onToggleSlowerSpeech: () => void;
   onTextInputChange: (val: string) => void;
   onSendTextMessage: () => void;
 }
@@ -17,105 +18,138 @@ interface VoiceControlsProps {
 export const VoiceControls: React.FC<VoiceControlsProps> = ({
   orbState,
   isListening,
-  isMuted,
+  isSlowerSpeech,
   textInput,
-  theme,
   onToggleMic,
-  onToggleMute,
+  onRepeatLastReply,
+  onToggleSlowerSpeech,
   onTextInputChange,
   onSendTextMessage
 }) => {
+  const [showTextInput, setShowTextInput] = useState(false);
+
+  // Status words from REAL events only
   const getStatusText = (): string => {
     switch (orbState) {
       case 'listening':
-        return 'Listening...';
+        return 'Listening';
       case 'transcribing':
-        return 'Processing speech...';
+        return 'Listening';
       case 'thinking':
-        return 'Thinking...';
+        return 'Thinking';
       case 'speaking':
-        return 'Speaking...';
+        return 'Speaking';
       case 'offline_error':
         return 'Tutor unavailable';
+      case 'idle':
       default:
         return 'Tap to talk';
     }
   };
 
-  const isOrbActive = orbState === 'listening' || orbState === 'speaking' || orbState === 'thinking';
+  const statusWord = getStatusText();
 
   return (
-    <div
-      className="p-3 sm:p-4 border-t transition-colors backdrop-blur-md"
-      style={{
-        backgroundColor: theme === 'dark' ? 'rgba(17, 24, 39, 0.95)' : 'rgba(255, 255, 255, 0.95)',
-        borderColor: theme === 'dark' ? '#263044' : '#E2E8F0'
-      }}
+    <div 
+      className="p-4 border-t border-[var(--border)] bg-[var(--surface)] backdrop-blur-md transition-colors"
+      role="region"
+      aria-label="Voice conversation controls"
     >
-      <div className="flex flex-col gap-3 max-w-2xl mx-auto">
-        {/* Primary Interactive Mic Button with Plain Status */}
-        <div className="flex items-center justify-center gap-4">
-          <button
-            onClick={onToggleMic}
-            className={`min-h-[48px] px-6 py-2.5 rounded-full font-semibold text-sm flex items-center gap-3 transition-all cursor-pointer shadow-md select-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-violet-500 ${
-              isListening
-                ? 'bg-rose-600 hover:bg-rose-500 text-white animate-pulse'
-                : isOrbActive
-                ? 'bg-violet-600 hover:bg-violet-500 text-white'
-                : 'bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white'
-            }`}
-            aria-label={getStatusText()}
-          >
-            {isListening ? (
-              <MicOff className="w-5 h-5 text-white animate-bounce" />
-            ) : (
-              <Mic className="w-5 h-5 text-white" />
-            )}
-            <span className="tracking-wide">{getStatusText()}</span>
-          </button>
+      <div className="max-w-[720px] mx-auto flex flex-col gap-3">
+        {showTextInput ? (
+          /* Type Instead Mode */
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowTextInput(false)}
+              className="min-h-[44px] min-w-[44px] px-3 rounded-[12px] bg-[var(--surface-2)] text-[var(--text)] border border-[var(--border)] hover:bg-[var(--surface)] transition-colors inline-flex items-center justify-center text-[14px] font-semibold cursor-pointer shrink-0"
+              title="Switch back to voice"
+              aria-label="Switch back to microphone"
+            >
+              <Mic className="w-5 h-5 text-[var(--accent)]" />
+            </button>
+            <input
+              type="text"
+              value={textInput}
+              onChange={(e) => onTextInputChange(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && onSendTextMessage()}
+              placeholder="Type your message to the tutor..."
+              aria-label="Message to tutor"
+              className="flex-1 min-h-[44px] px-4 py-2.5 rounded-[12px] bg-[var(--surface-2)] text-[var(--text)] border border-[var(--border)] focus:border-[var(--accent)] text-[16px] outline-none transition-colors"
+              autoFocus
+            />
+            <Button
+              variant="primary"
+              onClick={onSendTextMessage}
+              disabled={!textInput.trim()}
+              className="shrink-0"
+              aria-label="Send message"
+            >
+              <Send className="w-4 h-4 mr-1.5" />
+              <span>Send</span>
+            </Button>
+          </div>
+        ) : (
+          /* One Big Mic Button with Secondary Small Buttons */
+          <div className="flex items-center justify-between gap-3">
+            {/* Small Repeat button */}
+            <button
+              onClick={onRepeatLastReply}
+              className="min-h-[44px] min-w-[44px] px-3.5 py-2 rounded-[12px] bg-[var(--surface-2)] text-[var(--text)] border border-[var(--border)] hover:bg-[var(--surface)] transition-colors inline-flex items-center justify-center gap-1.5 text-[14px] font-medium cursor-pointer"
+              title="Repeat tutor's last response"
+              aria-label="Repeat tutor's last response"
+            >
+              <RotateCcw className="w-4 h-4 text-[var(--muted)]" />
+              <span className="hidden sm:inline">Repeat</span>
+            </button>
 
-          {/* Speaker Mute/Unmute */}
-          <button
-            onClick={onToggleMute}
-            className="w-11 h-11 rounded-full border flex items-center justify-center transition-colors cursor-pointer hover:border-violet-500 focus-visible:ring-2 focus-visible:ring-violet-500"
-            style={{
-              backgroundColor: theme === 'dark' ? '#1E293B' : '#F1F5F9',
-              borderColor: theme === 'dark' ? '#334155' : '#CBD5E1',
-              color: isMuted ? '#EF4444' : theme === 'dark' ? '#F8FAFC' : '#0F172A'
-            }}
-            aria-label={isMuted ? 'Unmute tutor audio' : 'Mute tutor audio'}
-            title={isMuted ? 'Unmute audio' : 'Mute audio'}
-          >
-            {isMuted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
-          </button>
-        </div>
+            {/* ONE Big Mic Button */}
+            <button
+              onClick={onToggleMic}
+              aria-pressed={isListening}
+              aria-label={`${statusWord} - click to toggle speech input`}
+              className={`flex-1 max-w-[280px] min-h-[52px] px-6 py-3 rounded-full font-bold text-[16px] inline-flex items-center justify-center gap-3 transition-all duration-150 cursor-pointer select-none shadow-[var(--shadow-sm)] active:scale-[0.98] ${
+                isListening
+                  ? 'bg-[var(--danger)] text-white animate-pulse'
+                  : 'bg-[var(--accent)] text-[var(--accent-contrast)] hover:opacity-95'
+              }`}
+            >
+              {isListening ? (
+                <MicOff className="w-5 h-5 text-white" />
+              ) : (
+                <Mic className="w-5 h-5" />
+              )}
+              <span>{statusWord}</span>
+            </button>
 
-        {/* Text fallback input */}
-        <div className="flex items-center gap-2">
-          <label htmlFor="voice-text-input" className="sr-only">Type a message to tutor</label>
-          <input
-            id="voice-text-input"
-            type="text"
-            value={textInput}
-            onChange={(e) => onTextInputChange(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && onSendTextMessage()}
-            placeholder="Or type a message to your tutor..."
-            className="flex-1 px-4 py-2.5 rounded-xl border text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 transition-colors"
-            style={{
-              backgroundColor: theme === 'dark' ? '#0F172A' : '#F8FAFC',
-              borderColor: theme === 'dark' ? '#334155' : '#CBD5E1',
-              color: theme === 'dark' ? '#F8FAFC' : '#0F172A'
-            }}
-          />
-          <button
-            onClick={onSendTextMessage}
-            disabled={!textInput.trim()}
-            className="w-11 h-11 rounded-xl bg-violet-600 hover:bg-violet-500 disabled:opacity-40 disabled:cursor-not-allowed text-white flex items-center justify-center transition-colors cursor-pointer focus-visible:ring-2 focus-visible:ring-violet-500"
-            aria-label="Send message"
-          >
-            <Send className="w-4 h-4" />
-          </button>
-        </div>
+            {/* Slower & Type Instead controls */}
+            <div className="flex items-center gap-2">
+              <button
+                onClick={onToggleSlowerSpeech}
+                className={`min-h-[44px] min-w-[44px] px-3.5 py-2 rounded-[12px] border transition-colors inline-flex items-center justify-center gap-1.5 text-[14px] font-medium cursor-pointer ${
+                  isSlowerSpeech
+                    ? 'bg-[var(--accent)]/15 border-[var(--accent)] text-[var(--accent)]'
+                    : 'bg-[var(--surface-2)] border-[var(--border)] text-[var(--text)] hover:bg-[var(--surface)]'
+                }`}
+                title={isSlowerSpeech ? 'Slower speech enabled' : 'Toggle slower speech'}
+                aria-pressed={isSlowerSpeech}
+                aria-label="Toggle slower speech rate"
+              >
+                <Gauge className="w-4 h-4 text-[var(--muted)]" />
+                <span className="hidden sm:inline">Slower</span>
+              </button>
+
+              <button
+                onClick={() => setShowTextInput(true)}
+                className="min-h-[44px] min-w-[44px] px-3 py-2 rounded-[12px] bg-[var(--surface-2)] text-[var(--text)] border border-[var(--border)] hover:bg-[var(--surface)] transition-colors inline-flex items-center justify-center gap-1.5 text-[14px] font-medium cursor-pointer"
+                title="Type message instead of speaking"
+                aria-label="Type instead"
+              >
+                <MessageSquare className="w-4 h-4 text-[var(--muted)]" />
+                <span className="hidden md:inline">Type</span>
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

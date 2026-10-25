@@ -243,11 +243,14 @@ export class SpeechController {
     }
   }
 
-  async startListening() {
+  async startListening(langOverride?: string): Promise<boolean> {
+    if (langOverride) {
+      this.setTargetLanguage(langOverride);
+    }
     if (!this.recognition) {
-      this.callbacks.onError('Microphone speech recognition is not supported in this frame. Please use the prompt chips or text input below.');
+      this.callbacks.onError('Microphone speech recognition is not supported in this browser. Please use text input below.');
       this.callbacks.onStateChange('idle');
-      return;
+      return false;
     }
 
     try {
@@ -260,11 +263,13 @@ export class SpeechController {
 
       this.isListeningActive = true;
       this.recognition.start();
+      return true;
     } catch (err: any) {
       this.isListeningActive = false;
       this.stopAudioAnalysis();
       this.callbacks.onStateChange('idle');
       console.warn('Speech recognition start notice:', err.message);
+      return false;
     }
   }
 

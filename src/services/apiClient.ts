@@ -28,6 +28,7 @@ export interface CurriculumLesson {
   samplePhrases: string[];
   bridgeNotes?: Record<string, string>;
   status?: string;
+  level?: string;
 }
 
 export interface CurriculumModule {
@@ -56,14 +57,17 @@ export interface VocabularyItem {
 
 export interface AssessmentAttempt {
   id: string;
-  topic_id: string;
+  topic_id?: string;
   topic_title: string;
-  pronunciation_score: number;
-  fluency_score: number;
-  grammar_score: number;
-  lexical_score: number;
+  pronunciation_score?: number | null;
+  fluency_score?: number | null;
+  grammar_score?: number;
+  lexical_score?: number;
+  accuracy_score?: number;
+  completion_score?: number;
   overall_score: number;
-  coaching_feedback: string;
+  feedback_tips?: string[];
+  coaching_feedback?: string;
   transcribed_text: string;
   created_at: string;
 }
@@ -242,9 +246,14 @@ export const apiClient = {
 
   // Curriculum
   async getCurriculum(targetLanguage?: string): Promise<CurriculumModule[]> {
-    const res = await request('/api/curriculum/personalized');
+    const res = await request('/api/curriculum/lessons');
     if (res.ok) {
-      const p = await res.json();
+      const data = await res.json();
+      if (data?.modules) return data.modules;
+    }
+    const persRes = await request('/api/curriculum/personalized');
+    if (persRes.ok) {
+      const p = await persRes.json();
       if (p?.modules) return p.modules;
     }
     return [];
@@ -286,6 +295,13 @@ export const apiClient = {
     return await res.json();
   },
 
+  // Curriculum Lessons Endpoint
+  async getCurriculumLessons(): Promise<{ version: string; reviewStatus: string; lessons: any[] }> {
+    const res = await request('/api/curriculum/lessons');
+    if (!res.ok) throw new Error('Failed to load lessons');
+    return await res.json();
+  },
+
   // Assessments
   async getAssessments(): Promise<AssessmentAttempt[]> {
     const res = await request('/api/assessments');
@@ -294,24 +310,61 @@ export const apiClient = {
   },
 
   async submitAssessment(payload: {
+    topic?: string;
     topic_id?: string;
     topic_title?: string;
+    target_language?: string;
+    learner_speech?: string;
     transcribed_text?: string;
+    duration_seconds?: number;
     user_voice_duration?: number;
+    fluency_wpm?: number;
     pronunciation_score?: number;
     fluency_score?: number;
     grammar_score?: number;
     lexical_score?: number;
-  }): Promise<AssessmentAttempt> {
+  }): Promise<{ success: boolean; assessment: AssessmentAttempt }> {
     const res = await request('/api/assessments', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     });
-    return await res.json();
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Assessment submission failed');
+    return data;
   },
 
   // Conversational AI
+  async chatWithTutor(payload: {
+    message: string;
+    targetLanguage?: string;
+    bridgeLanguage?: string;
+    scenario?: string;
+    mode?: string;
+    history?: Array<{ role: 'user' | 'model'; content: string }>;
+  }) {
+    const res = await request('/api/ai/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        message: payload.message,
+        targetLanguage: payload.targetLanguage,
+        bridgeLanguage: payload.bridgeLanguage,
+        scenarioContext: payload.scenario,
+        history: payload.history,
+        curriculumContext: {
+          lessonTitle: payload.scenario,
+          mode: payload.mode || 'conversation'
+        }
+      })
+    });
+    const result = await res.json();
+    if (!res.ok) {
+      throw new Error(result.error || 'Tutor unavailable, try again');
+    }
+    return result;
+  },
+
   async sendChatMessage(payload: {
     message: string;
     history?: Array<{ role: 'user' | 'model'; content: string }>;

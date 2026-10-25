@@ -111,7 +111,7 @@ export function isPromptInjectionAttempt(text: string): boolean {
 
 export async function generateLumaResponse(options: ChatRequestOptions): Promise<ChatResponseResult> {
   const apiKey = process.env.GEMINI_API_KEY;
-  const modelName = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+  const modelName = process.env.GEMINI_MODEL || 'gemini-3.8-flash';
   const targetCode = options.targetLanguage || 'en';
   const targetLangName = LANGUAGE_NAMES[targetCode] || 'English';
   const bridgeCode = options.bridgeLanguage || 'ta';
@@ -321,4 +321,144 @@ export async function generateSpeechAudio(options: TTSRequestOptions): Promise<T
     console.warn('[LUMA TTS Notice] Gemini audio generation not returned, falling back to browser synthesis:', err);
     return null;
   }
+}
+
+export const AssessmentRubricSchema = z.object({
+  grammar_score: z.number().min(0).max(100),
+  lexical_score: z.number().min(0).max(100),
+  relevance_score: z.number().min(0).max(100),
+  coaching_feedback: z.string().min(5)
+});
+
+export type AssessmentRubric = z.infer<typeof AssessmentRubricSchema>;
+
+export async function scoreAssessmentSubmission(params: {
+  text: string;
+  topicTitle?: string;
+  targetLanguage?: string;
+  proficiencyLevel?: string;
+  userVoiceDuration?: number;
+  timestamps?: number[];
+}): Promise<{
+  pronunciation_score: null;
+  fluency_score: number | null;
+  grammar_score: number;
+  lexical_score: number;
+  overall_score: number;
+  coaching_feedback: string;
+  measured_metrics: string[];
+}> {
+  const trimmed = params.text.trim();
+  // 1. Deterministic Gibberish & Spoken input validation
+  const validation = validateLearnerSpokenInput(trimmed);
+  if (!validation.valid) {
+    throw new Error(validation.reason || 'Spoken input rejected: insufficient or invalid speech.');
+  }
+
+  // 2. Deterministic checks
+  const words = trimmed.split(/\s+/).filter(Boolean);
+  const uniqueWords = new Set(words.map(w => w.toLowerCase()));
+  const lexicalDiversity = uniqueWords.size / words.length;
+
+  // Fluency: ONLY compute if real timestamps or duration provided
+  let fluency_score: number | null = null;
+  let hasRealTimestamps = false;
+  if (Array.isArray(params.timestamps) && params.timestamps.length >= 2) {
+    const elapsedSec = (params.timestamps[params.timestamps.length - 1] - params.timestamps[0]) / 1000;
+    if (elapsedSec > 0.5) {
+      const wpm = (words.length / elapsedSec) * 60;
+      if (wpm >= 90 && wpm <= 150) fluency_score = 90;
+      else if (wpm >= 60 && wpm < 90) fluency_score = 75;
+      else if (wpm > 150 && wpm <= 190) fluency_score = 80;
+      else fluency_score = 65;
+      hasRealTimestamps = true;
+    }
+  } else if (typeof params.userVoiceDuration === 'number' && params.userVoiceDuration > 0.5) {
+    const wpm = (words.length / params.userVoiceDuration) * 60;
+    if (wpm >= 90 && wpm <= 150) fluency_score = 90;
+    else if (wpm >= 60 && wpm < 90) fluency_score = 75;
+    else if (wpm > 150 && wpm <= 190) fluency_score = 80;
+    else fluency_score = 65;
+    hasRealTimestamps = true;
+  }
+
+  // 3. LLM Rubric via Gemini if configured, else Deterministic Rubric
+  let grammar_score: number;
+  let lexical_score: number;
+  let coaching_feedback: string;
+
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (apiKey && !apiKey.includes('MY_GEMINI_API_KEY')) {
+    try {
+      const ai = new GoogleGenAI({ apiKey });
+      const prompt = `You are a strict language assessment evaluator.
+Evaluate the learner's spoken explanation below for the topic: "${params.topicTitle || 'General Language Concept'}".
+Target Language: ${params.targetLanguage || 'en'} (Proficiency: ${params.proficiencyLevel || 'B1'}).
+Learner Text: "${trimmed}"
+
+Evaluate:
+- grammar_score (0-100): syntax correctness, word order, verb agreements.
+- lexical_score (0-100): vocabulary precision and appropriateness for level.
+- relevance_score (0-100): did they actually explain the topic clearly?
+- coaching_feedback: 1-2 constructive sentences on what was good and what to improve.
+
+Respond strictly in valid JSON matching this schema:
+{"grammar_score": number, "lexical_score": number, "relevance_score": number, "coaching_feedback": string}`;
+
+      const callPromise = ai.models.generateContent({
+        model: 'gemini-3.8-flash',
+        contents: [{ role: 'user', parts: [{ text: prompt }] }],
+        config: { responseMimeType: 'application/json' }
+      });
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('AI assessment call timed out after 2500ms')), 2500)
+      );
+
+      const res = await Promise.race([callPromise, timeoutPromise]);
+      const parsedText = res.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (parsedText) {
+        const rawJson = JSON.parse(parsedText);
+        const rubric = AssessmentRubricSchema.parse(rawJson);
+        grammar_score = Math.round(rubric.grammar_score);
+        lexical_score = Math.round(rubric.lexical_score);
+        coaching_feedback = rubric.coaching_feedback;
+      } else {
+        throw new Error('Empty model candidate');
+      }
+    } catch (llmErr) {
+      console.warn('[Assessment Scoring] LLM rubric evaluation fell back to deterministic baseline:', (llmErr as any)?.message);
+      const avgWordLength = trimmed.length / words.length;
+      lexical_score = Math.min(95, Math.max(50, Math.round(lexicalDiversity * 70 + avgWordLength * 4)));
+      const hasTerminalPunct = /[.!?]$/.test(trimmed);
+      const hasCaps = /^[A-Z\u0600-\u06FF]/.test(trimmed);
+      grammar_score = Math.min(95, Math.max(50, 70 + (hasTerminalPunct ? 10 : 0) + (hasCaps ? 5 : 0)));
+      coaching_feedback = 'Clear explanation. Keep expanding your range of vocabulary and grammatical structures.';
+    }
+  } else {
+    const avgWordLength = trimmed.length / words.length;
+    lexical_score = Math.min(95, Math.max(50, Math.round(lexicalDiversity * 70 + avgWordLength * 4)));
+    const hasTerminalPunct = /[.!?]$/.test(trimmed);
+    const hasCaps = /^[A-Z\u0600-\u06FF]/.test(trimmed);
+    grammar_score = Math.min(95, Math.max(50, 70 + (hasTerminalPunct ? 10 : 0) + (hasCaps ? 5 : 0)));
+    coaching_feedback = 'Solid explanation of the core concept. Continue practicing with diverse sentence structures.';
+  }
+
+  const measured = [grammar_score, lexical_score];
+  const measuredNames = ['grammar', 'lexical'];
+  if (fluency_score !== null) {
+    measured.push(fluency_score);
+    measuredNames.push('fluency');
+  }
+
+  const overall_score = Math.round(measured.reduce((a, b) => a + b, 0) / measured.length);
+
+  return {
+    pronunciation_score: null,
+    fluency_score,
+    grammar_score,
+    lexical_score,
+    overall_score,
+    coaching_feedback,
+    measured_metrics: measuredNames
+  };
 }

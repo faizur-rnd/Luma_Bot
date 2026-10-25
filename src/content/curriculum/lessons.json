@@ -1,0 +1,123 @@
+{
+  "version": "1.0.0",
+  "reviewStatus": "Draft, not yet reviewed",
+  "modules": [
+    {
+      "id": "mod_beginner_everyday",
+      "level": "Beginner",
+      "title": "Everyday Essentials",
+      "description": "Foundational spoken interactions for daily life",
+      "reviewStatus": "Draft, not yet reviewed",
+      "lessons": [
+        {
+          "id": "lesson_beg_01",
+          "title": "Ordering at a Cafe",
+          "scenario": "You are at a local coffee shop ordering a drink and snack.",
+          "level": "Beginner",
+          "durationMinutes": 15,
+          "objective": "Practice polite requests and clarifying preferences",
+          "samplePhrases": [
+            "Could I please have a cappuccino?",
+            "Do you have oat milk available?",
+            "How much does that come to?"
+          ],
+          "bridgeNotes": {
+            "ta": "கஃபேவில் மரியாதையாக காபி ஆர்டர் செய்யும் உரையாடல்."
+          },
+          "reviewStatus": "Draft, not yet reviewed"
+        },
+        {
+          "id": "lesson_beg_02",
+          "title": "Asking for Directions",
+          "scenario": "You are near the central station looking for the library.",
+          "level": "Beginner",
+          "durationMinutes": 15,
+          "objective": "Practice asking location questions and understanding directional cues",
+          "samplePhrases": [
+            "Excuse me, could you tell me where the library is?",
+            "Is it within walking distance?",
+            "Thank you for your help!"
+          ],
+          "bridgeNotes": {
+            "ta": "வழி கேட்கும் அடிப்படை வாக்கியங்கள்."
+          },
+          "reviewStatus": "Draft, not yet reviewed"
+        },
+        {
+          "id": "lesson_beg_03",
+          "title": "Introducing Yourself",
+          "scenario": "You meet a new colleague or neighbor for the first time.",
+          "level": "Beginner",
+          "durationMinutes": 15,
+          "objective": "Share your name, where you live, and what you enjoy doing",
+          "samplePhrases": [
+            "Hello! It is a pleasure to meet you.",
+            "I recently moved here from Chennai.",
+            "What do you enjoy doing on weekends?"
+          ],
+          "reviewStatus": "Draft, not yet reviewed"
+        }
+      ]
+    },
+    {
+      "id": "mod_intermediate_work",
+      "level": "Intermediate",
+      "title": "Workplace & Collaboration",
+      "description": "Clear and polite communication in professional settings",
+      "reviewStatus": "Draft, not yet reviewed",
+      "lessons": [
+        {
+          "id": "lesson_int_01",
+          "title": "Project Standup Update",
+          "scenario": "You are giving a 2-minute status update to your project team.",
+          "level": "Intermediate",
+          "durationMinutes": 20,
+          "objective": "Summarize yesterday's progress, today's goals, and potential blockers",
+          "samplePhrases": [
+            "Yesterday I completed the initial draft.",
+            "Today I am focusing on testing the edge cases.",
+            "I do not anticipate any major blockers right now."
+          ],
+          "reviewStatus": "Draft, not yet reviewed"
+        },
+        {
+          "id": "lesson_int_02",
+          "title": "Politely Declining a Meeting",
+          "scenario": "You have a conflict and need to reschedule a discussion.",
+          "level": "Intermediate",
+          "durationMinutes": 15,
+          "objective": "Acknowledge the invite, decline respectfully, and propose an alternative",
+          "samplePhrases": [
+            "Thank you for the invite. Unfortunately, I have a prior commitment.",
+            "Would Thursday morning work better for you?",
+            "I appreciate your flexibility."
+          ],
+          "reviewStatus": "Draft, not yet reviewed"
+        }
+      ]
+    },
+    {
+      "id": "mod_advanced_nuance",
+      "level": "Advanced",
+      "title": "Persuasion & Discussion",
+      "description": "Expressing opinions, nuance, and constructive feedback",
+      "reviewStatus": "Draft, not yet reviewed",
+      "lessons": [
+        {
+          "id": "lesson_adv_01",
+          "title": "Navigating a Difference of Opinion",
+          "scenario": "You and a partner disagree on the best solution for a problem.",
+          "level": "Advanced",
+          "durationMinutes": 25,
+          "objective": "Validate their perspective while articulating your rationale clearly",
+          "samplePhrases": [
+            "I see your point regarding speed, but reliability is our key risk.",
+            "What if we phased the rollout to mitigate that concern?",
+            "Let's look at the data before making the final call."
+          ],
+          "reviewStatus": "Draft, not yet reviewed"
+        }
+      ]
+    }
+  ]
+}

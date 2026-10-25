@@ -1,5 +1,5 @@
 {
-  "name": "react-example",
+  "name": "luma",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -10,6 +10,7 @@
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit",
     "test": "tsx src/test/runTests.ts",
+    "smoke": "tsx scripts/smokeTest.ts",
     "start": "tsx server.ts"
   },
   "dependencies": {
