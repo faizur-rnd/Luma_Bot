@@ -1,19 +1,23 @@
 @import "tailwindcss";
 
 :root {
-  /* Design System Tokens: Light Theme (default) */
-  --bg: #F7F8FC;
+  /* LUMA Next-Gen Speaking Studio Design System (Light Theme) */
+  --bg: #F8FAFC;
   --surface: #FFFFFF;
-  --surface-2: #EEF1FA;
-  --border: #E2E8F0;
+  --surface-2: #F1F5F9;
+  --surface-3: #E2E8F0;
+  --border: #CBD5E1;
   --text: #0F172A;
-  --muted: #475569;
-  --accent: #4F5BD5;
-  --accent-hover: #434ebc;
+  --muted: #64748B;
+  --accent: #4F46E5;
+  --accent-hover: #4338CA;
   --accent-contrast: #FFFFFF;
-  --success: #059669;
-  --warning: #B45309;
-  --danger: #DC2626;
+  --accent-subtle: #EEF2FF;
+  --accent-cyan: #0284C7;
+  --accent-purple: #7C3AED;
+  --success: #10B981;
+  --warning: #F59E0B;
+  --danger: #EF4444;
 
   /* Typography scale */
   --font-base: 16px;
@@ -28,10 +32,10 @@
   --radius-md: 16px;
   --radius-lg: 24px;
 
-  /* Soft shadows */
-  --shadow-sm: 0 1px 3px 0 rgba(15, 23, 42, 0.04), 0 1px 2px -1px rgba(15, 23, 42, 0.04);
-  --shadow-md: 0 4px 20px -2px rgba(15, 23, 42, 0.06);
-  --shadow-lg: 0 10px 30px -5px rgba(15, 23, 42, 0.10);
+  /* Polished Shadows */
+  --shadow-sm: 0 1px 3px 0 rgba(15, 23, 42, 0.05), 0 1px 2px -1px rgba(15, 23, 42, 0.05);
+  --shadow-md: 0 4px 20px -2px rgba(79, 70, 229, 0.08);
+  --shadow-lg: 0 10px 30px -5px rgba(79, 70, 229, 0.14);
 
   /* Touch Target */
   --touch-target: 44px;
@@ -39,81 +43,91 @@
 }
 
 .dark, [data-theme="dark"] {
-  /* Design System Tokens: Dark Theme */
-  --bg: #0B1020;
-  --surface: #121A30;
-  --surface-2: #1A2442;
-  --border: #26325A;
-  --text: #EAF0FF;
-  --muted: #9AA8CC;
-  --accent: #6C7BFF;
-  --accent-hover: #5A69FF;
-  --accent-contrast: #0B1020;
-  --success: #34D399;
-  --warning: #FBBF24;
-  --danger: #F87171;
+  /* LUMA Cosmic Starlight Obsidian (Dark Theme - Studio Grade) */
+  --bg: #090D16;
+  --surface: #111726;
+  --surface-2: #192238;
+  --surface-3: #222C4A;
+  --border: rgba(99, 102, 241, 0.22);
+  --text: #F8FAFC;
+  --muted: #94A3B8;
+  --accent: #6366F1;
+  --accent-hover: #4F46E5;
+  --accent-contrast: #FFFFFF;
+  --accent-subtle: rgba(99, 102, 241, 0.16);
+  --accent-cyan: #38BDF8;
+  --accent-purple: #A855F7;
+  --success: #10B981;
+  --warning: #F59E0B;
+  --danger: #EF4444;
 
-  --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.3);
-  --shadow-md: 0 4px 24px -2px rgba(0, 0, 0, 0.4);
-  --shadow-lg: 0 10px 40px -5px rgba(0, 0, 0, 0.6);
+  --shadow-sm: 0 1px 4px 0 rgba(0, 0, 0, 0.5);
+  --shadow-md: 0 4px 24px -2px rgba(99, 102, 241, 0.16);
+  --shadow-lg: 0 10px 40px -5px rgba(56, 189, 248, 0.2);
 }
 
-* {
-  box-sizing: border-box;
-}
-
-html {
-  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-  font-size: 16px;
-  line-height: 1.5;
-  background-color: var(--bg);
-  color: var(--text);
-  scroll-behavior: smooth;
-}
-
+/* System base & RTL typography */
 body {
-  margin: 0;
   background-color: var(--bg);
   color: var(--text);
-  font-size: 16px;
-  line-height: 1.5;
-  min-height: 100vh;
-  min-height: 100dvh;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans Arabic", "Noto Sans", Helvetica, Arial, sans-serif;
+  font-size: var(--font-base);
+  line-height: var(--line-height);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  overflow-x: hidden;
 }
 
-/* Typography enforce minimum 14px */
-body, button, input, textarea, select {
-  font-family: inherit;
-  font-size: 16px;
-  line-height: 1.5;
+/* Arabic Script Optimizations */
+[dir="rtl"], .font-arabic {
+  font-family: "Noto Sans Arabic", "Segoe UI Arabic", "Traditional Arabic", "Amiri", "Tahoma", sans-serif;
+  letter-spacing: 0;
+  line-height: 1.7;
 }
 
-/* Reduced motion preference */
-@media (prefers-reduced-motion: reduce) {
-  *, ::before, ::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-    scroll-behavior: auto !important;
-  }
-}
-
-/* Focus styles for WCAG 2.2 AA visible focus ring */
+/* Focus Visible Consistency */
 :focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
 
-/* Custom Scrollbar */
+/* Glassmorphism utility */
+.glass-panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+/* Micro-animations */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in-up {
+  animation: fadeInUp 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Voice Orb Particle Canvas */
+.voice-orb-canvas {
+  width: 100% !important;
+  height: 100% !important;
+  display: block;
+}
+
+/* Clean Custom Scrollbar */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: var(--bg);
+  background: transparent;
 }
 ::-webkit-scrollbar-thumb {
   background: var(--border);

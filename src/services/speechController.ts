@@ -357,7 +357,13 @@ export class SpeechController {
     try {
       const audioSrc = apiClient.getTtsAudioUrl(text, lang, gender);
       if (!audioSrc) {
-        this.speakWithBrowser(text, onEnd, lang);
+        if (onFallback) {
+          onFallback();
+        } else {
+          this.isSpeakingActive = false;
+          this.callbacks.onStateChange('idle');
+          onEnd?.();
+        }
         return;
       }
       const audio = new Audio(audioSrc);
@@ -504,7 +510,14 @@ export class SpeechController {
           }, 50);
         };
 
+        const safetyTimeout = setTimeout(() => {
+          if (this.isSpeakingActive && this.currentUtterance === utterance) {
+            cleanup();
+          }
+        }, Math.max(4000, text.length * 100));
+
         const cleanup = () => {
+          clearTimeout(safetyTimeout);
           if (speechPulseTimer) clearInterval(speechPulseTimer);
           this.currentUtterance = null;
           this.isSpeakingActive = false;
@@ -525,18 +538,16 @@ export class SpeechController {
         utterance.onerror = (e) => {
           console.warn('Browser speech synthesis notice:', e);
           cleanup();
-          // Fallback to cloud TTS if browser speech failed
-          this.playCloudTTS(text, targetLang, this.voiceGender, onEnd);
         };
 
         window.speechSynthesis.speak(utterance);
       } catch (err) {
-        console.warn('Browser speech synthesis error, using cloud TTS fallback:', err);
+        console.warn('Browser speech synthesis notice:', err);
         this.isSpeakingActive = false;
         this.lastSpokeEndTime = Date.now();
+        this.callbacks.onAudioLevel(0);
         this.callbacks.onStateChange('idle');
-        const targetLang = langOverride || this.targetLanguage;
-        this.playCloudTTS(text, targetLang, this.voiceGender, onEnd);
+        onEnd?.();
       }
     }, 25);
   }

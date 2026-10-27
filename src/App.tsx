@@ -2,6 +2,7 @@ import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { Navbar } from './components/Navbar';
 import { DailyMissionHub } from './components/DailyMissionHub';
 import { OfflineBanner, Skeleton } from './components/ui';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { apiClient, UserProfile } from './services/apiClient';
 
 const VoiceSessionView = lazy(() => import('./components/VoiceSessionView').then(m => ({ default: m.VoiceSessionView })));
@@ -76,19 +77,25 @@ export default function App() {
   // Initial data load
   useEffect(() => {
     let active = true;
-    Promise.allSettled([
-      apiClient.getProfile(),
-      apiClient.getPersonalizedCurriculum()
-    ]).then(([profRes, currRes]) => {
-      if (!active) return;
-      if (profRes.status === 'fulfilled' && profRes.value) {
-        setProfile(profRes.value);
-      }
-      if (currRes.status === 'fulfilled' && currRes.value) {
-        setCurriculum(currRes.value);
-      }
-      setIsLoading(false);
-    });
+    setIsLoading(true);
+
+    apiClient.checkAuth()
+      .then(async (authRes) => {
+        if (!active) return;
+        if (authRes.user) {
+          setProfile(authRes.user);
+        }
+        try {
+          const curr = await apiClient.getPersonalizedCurriculum();
+          if (active && curr) setCurriculum(curr);
+        } catch {
+          // Graceful fallback
+        }
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (active) setIsLoading(false);
+      });
 
     return () => { active = false; };
   }, []);
@@ -112,6 +119,16 @@ export default function App() {
     setShowSettings(true);
   };
 
+  const handleLanguageChange = async (newLang: string) => {
+    handleUpdateProfile({ target_language: newLang, targetLanguage: newLang });
+    try {
+      const updatedCurriculum = await apiClient.getCurriculum(newLang);
+      if (updatedCurriculum && updatedCurriculum.length > 0) {
+        setCurriculum({ modules: updatedCurriculum });
+      }
+    } catch {}
+  };
+
   return (
     <div className="min-h-screen flex flex-col bg-[var(--bg)] text-[var(--text)] transition-colors duration-200">
       <OfflineBanner />
@@ -123,6 +140,7 @@ export default function App() {
         theme={theme}
         setTheme={applyTheme}
         onNavigateHome={() => navigateTo('home')}
+        onLanguageChange={handleLanguageChange}
       />
 
       <div className="flex-1 flex max-w-[1200px] w-full mx-auto">
@@ -154,58 +172,60 @@ export default function App() {
 
         {/* Main Content Area */}
         <main className="flex-1 min-w-0 max-w-[960px] mx-auto w-full px-4 sm:px-6 py-6 pb-24 lg:pb-8" id="main-content">
-          {showOnboarding ? (
-            <Suspense fallback={<div className="space-y-4 pt-4"><Skeleton height={40} width={240} /><Skeleton height={180} /></div>}>
-              <OnboardingWizard
-                onComplete={() => {
-                  setShowOnboarding(false);
-                  navigateTo('home');
-                }}
-                onCancel={() => setShowOnboarding(false)}
-              />
-            </Suspense>
-          ) : isLoading ? (
-            <div className="space-y-6 pt-4">
-              <Skeleton height={40} width={240} />
-              <Skeleton height={200} />
-              <div className="grid grid-cols-2 gap-4">
-                <Skeleton height={96} />
-                <Skeleton height={96} />
+          <ErrorBoundary>
+            {showOnboarding ? (
+              <Suspense fallback={<div className="space-y-4 pt-4"><Skeleton height={40} width={240} /><Skeleton height={180} /></div>}>
+                <OnboardingWizard
+                  onComplete={() => {
+                    setShowOnboarding(false);
+                    navigateTo('home');
+                  }}
+                  onCancel={() => setShowOnboarding(false)}
+                />
+              </Suspense>
+            ) : isLoading ? (
+              <div className="space-y-6 pt-4">
+                <Skeleton height={40} width={240} />
+                <Skeleton height={200} />
+                <div className="grid grid-cols-2 gap-4">
+                  <Skeleton height={96} />
+                  <Skeleton height={96} />
+                </div>
               </div>
-            </div>
-          ) : (
-            <Suspense fallback={<div className="space-y-4 pt-4"><Skeleton height={40} width={240} /><Skeleton height={180} /></div>}>
-              {activeTab === 'home' && (
-                <DailyMissionHub
-                  curriculum={curriculum}
-                  profile={profile}
-                  onRetakeOnboarding={() => setShowOnboarding(true)}
-                  onSwitchToVoiceTutor={() => navigateTo('talk')}
-                />
-              )}
+            ) : (
+              <Suspense fallback={<div className="space-y-4 pt-4"><Skeleton height={40} width={240} /><Skeleton height={180} /></div>}>
+                {activeTab === 'home' && (
+                  <DailyMissionHub
+                    curriculum={curriculum}
+                    profile={profile}
+                    onRetakeOnboarding={() => setShowOnboarding(true)}
+                    onSwitchToVoiceTutor={() => navigateTo('talk')}
+                  />
+                )}
 
-              {activeTab === 'talk' && (
-                <VoiceSessionView
-                  profile={profile}
-                  initialLessonId={voiceInitialLessonId}
-                  onNavigateTab={(tab) => navigateTo(tab as TabId)}
-                />
-              )}
+                {activeTab === 'talk' && (
+                  <VoiceSessionView
+                    profile={profile}
+                    initialLessonId={voiceInitialLessonId}
+                    onNavigateTab={(tab) => navigateTo(tab as TabId)}
+                  />
+                )}
 
-              {activeTab === 'learn' && (
-                <LearnTabView
-                  profile={profile}
-                  onStartPractice={handleStartPracticeWithLesson}
-                />
-              )}
+                {activeTab === 'learn' && (
+                  <LearnTabView
+                    profile={profile}
+                    onStartPractice={handleStartPracticeWithLesson}
+                  />
+                )}
 
-              {activeTab === 'progress' && (
-                <ProgressTabView
-                  profile={profile}
-                />
-              )}
-            </Suspense>
-          )}
+                {activeTab === 'progress' && (
+                  <ProgressTabView
+                    profile={profile}
+                  />
+                )}
+              </Suspense>
+            )}
+          </ErrorBoundary>
         </main>
       </div>
 

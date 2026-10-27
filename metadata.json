@@ -1,8 +1,10 @@
 {
-  "name": "LUMA - AI Language Tutor",
-  "description": "Find your voice. Think in a new language. Premium AI-powered conversational language tutor with real-time speech, Voice Orb, and Neon Serverless PostgreSQL persistence.",
+  "name": "LUMA - Speaking Coach",
+  "description": "Personalized 12-week articulation and accent training platform for pronunciation clarity, rhythm, stress, and speaking confidence.",
   "requestFramePermissions": [
     "microphone"
   ],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
 }

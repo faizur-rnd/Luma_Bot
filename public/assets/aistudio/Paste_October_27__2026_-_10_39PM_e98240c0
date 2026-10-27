@@ -1,0 +1,898 @@
+LUMA — MASTER ONE-SHOT GO-LIVE IMPLEMENTATION PROMPT
+
+Act as a senior full-stack engineer, speech-science engineer, product designer, security engineer, QA lead, and DevOps engineer. Your task is to transform the existing LUMA repository into a production-oriented articulation and accent training platform through a complete, tested, module-by-module implementation.
+
+Do not merely produce a plan, mockup, prototype, or list of suggested changes. Inspect the existing repository and implement the application directly.
+
+Work autonomously wherever requirements are clear. Preserve existing working functionality, reuse existing components, and integrate with the current architecture instead of unnecessarily rebuilding it.
+
+If the environment imposes execution or context limits, complete the highest-priority work first, maintain a persistent implementation status document, and resume from the next incomplete module. Never mark unfinished work as complete.
+
+1. PRODUCT VISION
+
+Build LUMA, a personalized speaking coach that helps learners improve articulation, pronunciation clarity, rhythm, stress, fluency, and confidence through a structured 12-week program.
+
+LUMA is NOT a generic language tutor.
+
+Initial supported languages
+English (en): mandatory first target language.
+Tamil (ta): priority learner native language in wave 1.
+Arabic (ar): priority learner native language in wave 1.
+
+Wave 1 must support:
+
+Tamil L1 → English target training.
+Arabic L1 → English target training.
+English reference content and English pronunciation assessment.
+Tamil and Arabic interface localization where feasible within the first implementation wave.
+
+Wave 2 adds Tamil and Arabic as target training languages, complete target-language drill libraries, and fully localized interfaces.
+
+Keep unsupported language and provider combinations behind explicit feature flags.
+
+Core user journey
+Register and authenticate.
+Review and grant separate privacy consents for audio storage, transcript storage, and analytics.
+Complete onboarding:
+Native language.
+Target language and accent.
+Real-world speaking goal.
+Daily practice duration.
+Microphone permission and recording test.
+Complete the day-0 baseline:
+Read a fixed passage aloud.
+Speak freely for 60 seconds.
+Generate real pronunciation measurements where supported.
+Persist recordings and assessment results according to consent.
+Receive a personalized 12-week training plan.
+Complete daily practice sessions:
+Warm-up.
+Articulation drills.
+Shadowing.
+Guided conversation.
+Reflection and summary.
+Complete weekly checkpoints and full retests in weeks 4, 8, and 12.
+Review progress and compare the baseline with the final assessment.
+Play eligible baseline and final recordings, export a PDF report, and optionally share a revocable, expiring, read-only report link.
+Export or permanently delete personal data, including stored audio.
+
+The product must work on desktop and mobile, including mobile browsers.
+
+2. MANDATORY ENGINEERING RULES
+
+Apply these rules throughout the project.
+
+Inspect the repository, package scripts, architecture, existing UI, database schema, authentication, privacy implementation, and tests before changing anything.
+Use the existing stack where available: React 19, Vite, Express, Neon Postgres, Gemini via @google/genai, Tailwind CSS v4, and the existing design tokens.
+Do not replace working infrastructure without a documented technical reason.
+Keep every source file under 300 lines. Split larger files into focused modules.
+Reuse existing components in src/components/ui.
+Use existing design tokens. Never introduce arbitrary hardcoded hexadecimal colors.
+All database schema changes must be additive migrations.
+Every new API endpoint must include:
+Authentication.
+Zod request and response validation where appropriate.
+CSRF protection for cookie-authenticated state-changing requests.
+User ownership enforcement.
+Input limits and abuse protection.
+Appropriate error handling.
+Automated tests in src/test or the existing test structure.
+Never trust a client-supplied user ID. Derive identity from the authenticated server session.
+Never fabricate scores, transcripts, progress, audio, provider capabilities, or test results.
+Clearly distinguish Measured, Estimated, and Not available.
+When a measurement is unavailable, return no fabricated numeric measurement for that metric.
+Never represent transcript similarity or an LLM-generated opinion as a clinically validated or objectively measured phoneme score.
+Do not silently fall back to simulated production data.
+Keep mock providers restricted to tests and explicit development environments.
+Never expose API keys, storage credentials, signed URLs with excessive lifetimes, or internal provider errors to the browser.
+Preserve existing routes and functionality unless a documented migration is necessary.
+Do not introduce payment processing until retention and beta data justify it.
+Keep learner-facing interfaces accessible, responsive, and keyboard navigable.
+After every module, run the relevant checks and then npm run lint, npm test, and npm run build. Fix failures before proceeding whenever possible.
+Inspect actual command output. Never claim a test passed if it was not executed successfully.
+Do not delete existing project data or destructive infrastructure.
+Never delete the repository's .aistudio/ folder until verifying its contents and confirming the requested cleanup will not destroy required credentials or irreplaceable user work. If cleanup is safe, remove it.
+Do not implement fake third-party integrations. If credentials or external infrastructure are missing, build the integration, add configuration and clear setup documentation, and mark live verification as blocked.
+At the end of each module, update STATUS.md with completed work, changed files, tests executed, remaining blockers, and the next module.
+3. PHASE 0 — REPOSITORY AUDIT AND EXECUTION
+
+Before implementing features:
+
+Inspect all repository files relevant to the application.
+Read package.json, existing README and status files, database schema and migrations, API routes, authentication, consent handling, audio functionality, AI integrations, and tests.
+Identify incomplete implementations, broken imports, existing security controls, and incompatible dependencies.
+Determine whether the application already contains any of the requested modules.
+Preserve existing conventions and avoid duplicate implementations.
+Create a concise docs/IMPLEMENTATION_AUDIT.md.
+Establish the actual baseline results for lint, tests, and build.
+Fix existing blockers that directly prevent the requested implementation.
+
+Do not stop after producing the audit. Continue immediately into implementation.
+
+If a required script is missing, add an appropriate script using the existing toolchain rather than pretending it exists.
+
+4. MODULE 1 — PRODUCT REPOSITIONING AND REPOSITORY CLEANUP
+
+Reposition all application copy and metadata around LUMA as a 12-week articulation and accent training platform.
+
+Tasks:
+
+Safely remove .aistudio/ if it is disposable and contains no required user work or credentials.
+Rewrite README.md.
+Rewrite STATUS.md as a truthful implementation tracker.
+Update metadata.json and any equivalent application metadata.
+Reconcile test counts with actual npm test output and GO_LIVE_REPORT.md.
+Rename user-facing references to “language tutor” as “speaking coach”.
+Restrict supported languages in languageRegistry.ts to en, ta, and ar for the current release, with explicit flags for future target-language support.
+Remove unsupported product promises and misleading feature claims.
+Document setup, environment variables, test commands, and known limitations.
+
+Acceptance: no documentation claims functionality that the application does not implement.
+
+5. MODULE 2 — DATABASE AND MIGRATION SYSTEM
+
+Implement an ordered, repeatable migration runner using numbered SQL files under src/server/migrations and a schema_migrations tracking table.
+
+Requirements:
+
+Execute migrations in ascending order.
+Prevent concurrent startup processes from applying the same migration unsafely.
+Use transactions where supported and appropriate.
+Make migrations repeatable without duplicating schema objects.
+Fail startup clearly when a required migration fails.
+Support an empty database and existing installations.
+
+Migration 001 must add or extend the following schema.
+
+User profile fields
+native_language
+target_accent
+goal
+program_start_date
+audio_recordings
+id
+user_id
+kind: baseline, drill, conversation, retest
+storage_key
+duration_ms
+sample_rate
+created_at
+deleted_at
+pronunciation_attempts
+id
+user_id
+recording_id
+drill_id
+reference_text
+provider
+language
+accuracy
+fluency
+prosody
+completeness
+overall
+phonemes JSONB
+words JSONB
+measurement_status: measured, estimated, unavailable
+created_at
+drills
+id
+language
+l1
+category
+payload JSONB
+level
+review_status
+program_enrollments
+id
+user_id
+week_number
+plan JSONB
+status
+checkpoints
+id
+user_id
+week_number
+type: baseline, weekly, retest
+attempt_id
+metrics JSONB
+created_at
+phoneme_mastery
+user_id
+language
+phoneme
+mastery REAL
+last_seen
+next_review_at
+
+Also implement:
+
+Appropriate primary keys, foreign keys, unique constraints, indexes, timestamps, and ON DELETE CASCADE relationships where correct.
+Existing consent schema integration.
+Safe database connection management.
+A comprehensive purge operation that removes user-associated rows, recordings, share tokens, cached personal data, and stored audio objects.
+Tests that migrate an empty database and verify that user deletion or purge removes all associated data.
+
+Use migrations 002, 003, and later for subsequent additive changes. Never rewrite an already deployed migration to change its behavior.
+
+6. MODULE 3 — REAL AUDIO RECORDING AND PRIVATE STORAGE
+
+Implement a browser-based audio recording service using MediaRecorder, with an appropriate fallback for browsers that need an AudioWorklet-based capture pipeline.
+
+Requirements:
+
+Request microphone permission explicitly.
+Record genuine microphone audio.
+Resample to 16 kHz, mono, 16-bit PCM WAV in the browser when compatible.
+Enforce a maximum clip duration of 90 seconds.
+Display a live audio level meter and waveform.
+Handle permission denial, missing devices, interrupted recordings, and unsupported codecs.
+Provide a clear recording playback and retry experience.
+Never upload a fabricated recording.
+
+Implement private object storage compatible with S3, Cloudflare R2, or MinIO through environment-based configuration.
+
+Create:
+
+POST /api/audio
+GET /api/audio/:id
+
+The upload endpoint must enforce multipart size limits, MIME and actual media validation, ownership, CSRF where applicable, and rate limiting of 30 requests per minute per user.
+
+Use per-user storage prefixes and opaque object keys.
+
+For playback, issue short-lived signed URLs only after verifying the authenticated user owns the recording.
+
+Respect privacy_consents.store_audio_samples. If audio storage consent is false, process the recording only as permitted, discard temporary audio and derived artifacts when no longer needed, and do not persist the original recording.
+
+Add:
+
+A configurable retention policy, defaulting to 90 days for ordinary stored audio.
+A scheduled cleanup job.
+Immediate purge support.
+Idempotent cleanup behavior.
+Storage failure handling and orphan-object cleanup.
+Tests for ownership, oversized uploads, invalid media, storage consent, expiration, and purge.
+
+The original baseline must remain available until the user deletes it or revokes the relevant retention consent, subject to applicable legal requirements. If retention is revoked, honor that choice and explain that final-report playback may no longer be possible.
+
+Document Chrome Android and iOS Safari limitations and provide manual device-testing instructions.
+
+7. MODULE 4 — HONEST PRONUNCIATION SCORING
+
+Create a provider abstraction in src/server/scoring/ScoringProvider.ts.
+
+The interface must accept audio, reference text, target language, and accent, and return validated results containing:
+
+Accuracy.
+Fluency.
+Prosody.
+Completeness.
+Per-word results.
+Per-phoneme results when genuinely supported.
+Provider metadata.
+Measurement status.
+Explicit capabilities by language.
+
+Implement:
+
+An Azure pronunciation-assessment provider using its supported reference-text assessment and phoneme-granularity features.
+An unavailable provider that returns measurement_status: unavailable.
+An estimated provider for combinations that lack verified phoneme-level assessment, using supported speech recognition, reference alignment, and optional Gemini coaching feedback.
+
+Do not assume every provider supports every language or metric.
+
+Before coding the provider registry, verify current official documentation for English, Tamil, and Arabic. Record:
+
+Supported locales.
+Phoneme-level assessment availability.
+Prosody support.
+Reference-text mode support.
+Known limitations.
+Pricing source and date checked.
+
+Write the findings to docs/provider-support.md.
+
+English phoneme-level assessment is mandatory for the intended production experience. If the selected provider cannot verify it, report the blocker and evaluate a documented alternative rather than silently shipping fabricated phoneme scores.
+
+Tamil and Arabic may initially use estimated or unavailable measurements until actual capabilities are verified.
+
+Implement provider selection through configuration, not hardcoded assumptions scattered across the application.
+
+Create POST /api/scoring/attempt accepting validated recording_id and drill_id.
+
+Requirements:
+
+Verify recording ownership.
+Validate target language and reference text.
+Enforce a per-user daily scoring cap.
+Implement an in-memory result cache keyed by an audio hash plus relevant assessment parameters.
+Avoid caching personal audio indefinitely.
+Validate provider responses before persistence.
+Persist attempts to pronunciation_attempts.
+Return explicit measurement status and metric-level availability.
+Never return a numeric score for a metric that is unavailable.
+Never show estimated scores as measured scores.
+Handle provider timeouts, quotas, and malformed responses.
+
+Add mocked-provider tests for all statuses, error conditions, ownership checks, caching, and score validation.
+
+8. MODULE 5 — SPEECH RECOGNITION AND REFERENCE AUDIO
+
+Extend speechController.ts and related services.
+
+Required language and accent mapping:
+
+English: en-IN and en-US, selected by target accent.
+Tamil: ta-IN.
+Arabic: ar-SA, with an optional Gulf/Egyptian dialect setting if supported by the selected provider.
+
+Implement a server-side speech-recognition provider interface for unsupported browsers and cases where browser transcription is unavailable or confidence is inadequate.
+
+Tamil transcription must be a first-class supported requirement, not an empty placeholder.
+
+Implement reference speech generation for English, Tamil, and Arabic using suitable configured voices and supported providers.
+
+Cache generated reference audio by normalized text, language, voice, and generation settings in private object storage. Reuse cached audio instead of regenerating it for every learner.
+
+Requirements:
+
+Do not cache user-specific speech under public keys.
+Do not invent transcripts when speech recognition fails.
+Surface unsupported locales and low-confidence recognition honestly.
+Keep provider credentials server-side.
+Add unit tests for locale selection, dialect selection, fallback logic, and cache keys.
+Add a manual test document with sample phrases and expected behavior for all three languages.
+9. MODULE 6 — STRUCTURED ARTICULATION CONTENT
+
+Create validated content schemas under src/content/articulation.
+
+Required content categories:
+
+Phoneme inventories with IPA.
+Example words.
+Mouth and tongue placement cues.
+Minimal pairs.
+Consonant clusters.
+Word stress.
+Sentence stress and intonation.
+Tongue twisters.
+Shadowing passages.
+Baseline passages.
+
+Each drill must include appropriate language metadata, reference text, learner L1, cue text, difficulty level, category, and review status.
+
+Create L1-to-English confusion maps for:
+
+Tamil → English.
+Arabic → English.
+
+These maps must identify candidate sound contrasts and rhythm challenges while clearly marking all unverified material needs expert review.
+
+Seed at least:
+
+40 English drills for Tamil L1 learners.
+40 English drills for Arabic L1 learners.
+Three baseline passages of increasing difficulty.
+
+Create a content import script that:
+
+Validates every record using Zod.
+Rejects malformed content.
+Imports content idempotently.
+Preserves review status.
+Does not duplicate records on repeated runs.
+
+Show review-status labels only in an admin/debug interface, never as learner-facing performance judgments.
+
+Add tests ensuring every drill has valid reference text, cue text, language metadata, and difficulty level.
+
+Do not claim the material is scientifically validated before expert review.
+
+10. MODULE 7 — ONBOARDING AND DAY-0 BASELINE
+
+Extend the existing onboarding wizard rather than creating a disconnected flow.
+
+Capture:
+
+Native language.
+Target language.
+Target accent.
+Speaking goal: interview, client calls, presentations, or other.
+Daily practice duration.
+Audio-storage consent.
+Transcript-storage consent.
+Analytics consent.
+Microphone test results.
+
+Consent must be separate, understandable, unbundled where appropriate, and revocable.
+
+Implement the baseline flow:
+
+Explain the assessment.
+Play the selected reference passage.
+Record the learner reading it.
+Record 60 seconds of free speech.
+Score the read-aloud recording against its reference text.
+Analyze free speech only using metrics actually supported by the selected provider.
+Persist valid results and checkpoint records.
+Show the top three candidate sounds to practice only when evidence supports them.
+Explain each result in plain language.
+Provide a retry path for failed recording or assessment.
+
+Do not invent a baseline if the provider fails.
+
+Persist baseline audio only under valid consent and retention rules.
+
+Tests must cover successful onboarding, denied microphone permission, interrupted recording, unavailable scoring, and consent-off behavior.
+
+11. MODULE 8 — TWELVE-WEEK PROGRAM ENGINE
+
+Implement a deterministic planning service based on:
+
+Learner L1.
+Target language.
+Baseline results.
+Verified weak phonemes.
+Daily practice duration.
+Previously completed sessions.
+Spaced-repetition schedule.
+
+Create a 12-week plan containing:
+
+Weekly themes.
+Target sounds.
+Five sessions per week.
+Review intervals.
+Difficulty progression.
+Checkpoints.
+Adaptation rules.
+
+Do not target sounds based on invented phoneme scores. When assessment data is insufficient, use a clearly identified provisional plan based on the learner's profile and validated content.
+
+The default daily session structure is:
+
+Warm-up: 2 minutes.
+Sound drills: 5 minutes.
+Shadowing: 4 minutes.
+Guided conversation: 3 minutes.
+Reflection: 1 minute.
+
+Total: 15 minutes.
+
+Adapt the session to the user's configured daily goal while keeping the total duration within one minute of the goal. Document rounding and minimum-duration rules.
+
+Implement:
+
+Program persistence in program_enrollments.
+GET /api/program
+GET /api/program/today
+POST /api/program/sessions/:id/complete
+
+Require authentication, validate input, enforce ownership, and make completion idempotent.
+
+Unlock the next week after at least three completed sessions or an explicit, authorized manual override.
+
+Missed days must compress or reschedule remaining activities without punitive language or fabricated completion.
+
+Update phoneme_mastery only using valid evidence, and use spaced repetition to resurface weak sounds.
+
+Add deterministic planner tests, duration tests, unlock tests, and missed-day tests.
+
+12. MODULE 9 — DAILY PRACTICE, TALK, AND HOME UI
+
+Build a polished, coherent, production-oriented learner experience using the existing design system.
+
+Home screen
+
+Display:
+
+Current week and day.
+Real completion progress.
+A primary action labeled “Start today's session”.
+The next activity.
+A clear measurement-status indicator where relevant.
+
+Do not invent streaks, scores, completion counts, or improvement percentages.
+
+Drill screen
+
+Include:
+
+Reference text.
+Listen-to-model button.
+Record and stop controls.
+Live audio level/waveform.
+Processing state.
+Per-word feedback when supported.
+Per-phoneme details when genuinely available.
+Playback of the learner's recording.
+Model-versus-learner replay.
+Retry and next controls.
+
+Use the following status language consistently:
+
+Measured.
+Estimated.
+Not available.
+
+Never imply that estimated word feedback is a measured phoneme score.
+
+Session player
+
+Guide the learner through:
+
+Warm-up.
+Sound drill.
+Shadowing.
+Guided conversation.
+Reflection.
+
+Show session progress and meaningful transitions.
+
+Session summary
+
+Display actual:
+
+Completed activities.
+Time spent.
+Sounds to retry, when supported.
+Session reflection.
+Next session preview.
+Talk screen
+
+Retain the existing orb as an optional visual mode. Turn it off by default on low-power devices or when the learner disables it.
+
+Display conversation transcripts with supported pronunciation feedback after each turn.
+
+Use actual scoring results when available. Do not highlight words as mispronounced merely because the LLM guesses that they are incorrect.
+
+Accessibility and responsive design
+
+Test layouts at:
+
+320 px.
+360 px.
+390 px.
+768 px.
+1024 px.
+1440 px.
+
+Implement keyboard accessibility, visible focus indicators, accessible form errors, semantic controls, screen-reader labels, reduced-motion support, and WCAG AA contrast.
+
+Reuse existing UI components and tokens.
+
+13. MODULE 10 — PROGRESS, RETESTS, AND FINAL REPORT
+
+Implement a progress dashboard using persisted assessment and session data.
+
+Track, when supported:
+
+Pronunciation clarity or provider-defined assessment scores.
+Per-sound mastery.
+Speech rate.
+Pause ratio.
+Filler words.
+Weekly self-rated confidence from 1 to 5.
+Practice consistency.
+Completed sessions.
+
+Every metric must have a defined calculation, measurement status, and provenance. Do not compare scores from incompatible providers or assessment methods without a documented normalization method.
+
+Implement checkpoints:
+
+Weekly mini-retests using the same baseline passage.
+Full retests at weeks 4, 8, and 12.
+Comparable assessment settings when possible.
+Clear warnings when comparison is limited.
+
+Implement a final report containing:
+
+Baseline versus final measurements.
+Honest interpretation of change.
+Measurement coverage and unavailable metrics.
+Playable baseline and final recordings when retained and authorized.
+Practice history.
+PDF export.
+Optional read-only sharing.
+
+Shared reports must use cryptographically secure random tokens, store only appropriately protected token material, support expiration and revocation, and expose no email, internal user ID, private transcripts, or unrelated recordings.
+
+Apply rate limits and prevent token enumeration.
+
+A report must remain honest when there is insufficient baseline or final data. Never fabricate an improvement percentage.
+
+Add seeded-data report tests and sharing security tests.
+
+14. MODULE 11 — TAMIL AND ARABIC TARGET TRAINING, I18N, AND RTL
+
+Implement this as the second release wave, while creating the required architecture during earlier modules.
+
+Add internationalization using react-i18next or an equivalent maintained solution compatible with the existing repository.
+
+Required interface locales:
+
+English.
+Tamil.
+Arabic.
+
+Requirements:
+
+Translate all core navigation, onboarding, consent, practice, progress, settings, and error states.
+Use correct locale metadata.
+Implement Arabic right-to-left layout.
+Prefer logical CSS properties over hardcoded left/right assumptions.
+Add layout tests for RTL and long translated strings.
+Self-host suitable fonts, such as Noto Sans Tamil and Noto Naskh Arabic or IBM Plex Arabic, subject to licensing and repository constraints.
+Add Tamil and Arabic target-language phoneme inventories, minimal pairs, and baseline passages following the existing content schemas.
+Add target-language-specific provider capability checks.
+Keep unsupported measurement features unavailable rather than faking results.
+Update Gemini coaching prompts to respond and correct in the target language while explaining in the learner's L1 where appropriate.
+Respect provider support for each target-language and L1 combination.
+
+Feature-flag Tamil and Arabic target training independently.
+
+Acceptance: complete supported onboarding and practice flows in all three interface languages without clipped, incorrectly mirrored, or inaccessible layouts.
+
+15. MODULE 12 — PRIVACY, SECURITY, QUALITY, AND COMPLIANCE
+
+Implement a robust production-readiness layer.
+
+Automated testing
+
+Add Playwright end-to-end tests covering:
+
+Registration.
+Consent.
+Onboarding.
+Baseline recording.
+Baseline scoring.
+Daily session.
+Session completion.
+Weekly checkpoint.
+Full retest.
+Report generation.
+Report sharing and revocation.
+Data export.
+Account deletion and audio purge.
+
+Use a mocked scoring provider in deterministic tests. Clearly separate these tests from live provider verification.
+
+Add:
+
+Unit tests.
+API integration tests.
+Database migration tests.
+Ownership and authorization tests.
+Upload abuse tests.
+Accessibility checks.
+Mobile viewport tests.
+RTL layout tests.
+Privacy and account controls
+
+Create or complete:
+
+Privacy policy page.
+Terms page.
+Plain-language audio consent.
+Transcript consent.
+Analytics consent.
+Consent revocation.
+Data export.
+Delete-my-data settings.
+Account deletion.
+Audio purge.
+
+Ensure derived data and backups are handled according to documented retention rules and applicable legal obligations.
+
+Do not claim legal compliance or certification without qualified review.
+
+Security controls
+
+Implement:
+
+Rate limits.
+Request validation.
+Secure cookies and session handling.
+CSRF protection where applicable.
+Appropriate content security policies.
+Secure headers.
+Ownership checks.
+Signed URL expiration.
+Random share tokens.
+Secrets management.
+Safe error responses.
+File upload restrictions.
+Dependency vulnerability checks.
+Logging redaction.
+Audio deletion verification.
+Monitoring
+
+Add structured logs, request IDs, error tracking such as Sentry when configured, and basic metrics:
+
+Sessions completed.
+Assessment attempts.
+Provider errors.
+Provider latency.
+Per-user daily scoring usage and estimated cost.
+Audio storage usage.
+Retention cleanup failures.
+
+Never log raw audio, access tokens, passwords, private transcripts, or sensitive personal data unnecessarily.
+
+CI must run lint, unit tests, integration tests, end-to-end tests, build, and dependency audit, with environment-dependent tests clearly reported when infrastructure is unavailable.
+
+16. MODULE 13 — DEPLOYMENT AND CLOSED BETA
+
+Prepare the project for deployment to an appropriate managed host such as Cloud Run, Render, or Fly.io.
+
+Implement:
+
+Production Dockerfile.
+Docker Compose for local development.
+Production-safe Express configuration.
+Neon Postgres configuration.
+S3-compatible object storage configuration.
+Secrets supplied through environment variables.
+Database migrations during controlled deployment.
+/healthz.
+/readyz.
+Staging environment documentation.
+Daily database backup instructions.
+A documented restore drill.
+Uptime monitoring guidance.
+Custom-domain and HTTPS setup.
+Invite-only signup feature flag.
+Tamil and Arabic target-language flags.
+Scoring and AI cost alerts.
+Rollback instructions.
+
+Never embed real secrets in the repository.
+
+Do not report deployment as successful unless the application has actually been deployed and verified in the target environment.
+
+Create docs/GO_LIVE_CHECKLIST.md covering:
+
+Phonetics expert sign-off.
+Provider support verification.
+Privacy and legal review.
+Audio-consent verification.
+Microphone testing on mobile devices.
+Database migration verification.
+Backup and restore verification.
+Cost limits.
+Beta access controls.
+Monitoring.
+Rollback.
+Incident response.
+
+Provide a deployment guide for a fresh environment and a manual test script for a real phone.
+
+17. REQUIRED PRODUCT AND DATA INTEGRITY RULES
+
+These rules take precedence over cosmetic completeness.
+
+Pronunciation measurements
+measured: an actual supported provider measurement.
+estimated: a transparently labeled approximation with documented methodology.
+unavailable: no defensible measurement could be produced.
+
+Do not map unavailable metrics to zero.
+
+Do not create artificial numerical confidence or improvement scores.
+
+Keep metric-level availability when a provider supports some metrics but not others.
+
+Baseline and final reports
+
+Do not generate a valid before/after comparison without comparable source data.
+
+Do not label a recording as day 90 if it was recorded at a different time.
+
+Do not claim a learner improved because a training session was completed.
+
+Audio and privacy
+
+Separate the ability to process audio from permission to retain it.
+
+Honor consent withdrawal and deletion requests.
+
+Delete temporary files after processing.
+
+Use private storage and authenticated access.
+
+Content quality
+
+Mark unreviewed phonetics content clearly in internal metadata.
+
+Do not represent heuristic L1 confusion maps as established facts about every Tamil or Arabic speaker.
+
+Support individual variation and allow a learner's actual measured difficulties to override general heuristics.
+
+Cost controls
+
+Add configurable limits for scoring attempts, AI requests, transcription, and audio storage.
+
+Prefer cached reusable reference audio over repeated generation.
+
+Prevent accidental retry loops from generating uncontrolled provider costs.
+
+18. EXECUTION ORDER AND DEPENDENCIES
+
+Execute these modules in order, honoring dependencies:
+
+Repository audit and baseline checks.
+Module 1: product positioning and cleanup.
+Module 2: migrations and data model.
+Module 3: audio capture and storage.
+Module 4: scoring engine.
+Module 5: speech recognition and TTS.
+Module 6: articulation content.
+Module 7: onboarding and baseline.
+Module 8: program engine.
+Module 9: practice and Talk UI.
+Module 10: progress and reports.
+Module 11: Tamil/Arabic target training and localization.
+Module 12: quality, privacy, and compliance.
+Module 13: deployment and closed beta.
+
+You may create shared infrastructure earlier when necessary, but do not skip acceptance checks or claim a dependent module is finished before its prerequisites work.
+
+After each module:
+
+Inspect the diff.
+Check for unrelated changes.
+Run npm run lint.
+Run npm test.
+Run npm run build.
+Run relevant integration or end-to-end tests.
+Fix failures before proceeding, or record a specific blocker when the environment prevents resolution.
+Update STATUS.md.
+Update GO_LIVE_REPORT.md using actual results.
+Continue immediately to the next module.
+
+If execution limits interrupt the work, leave a precise checkpoint containing the current module, completed tasks, incomplete tasks, failed commands, changed files, and the exact next action.
+
+Do not repeatedly redo completed work. Inspect status and Git diff before resuming.
+
+19. FINAL DELIVERABLES
+
+The finished repository must include:
+
+A functioning LUMA application.
+A coherent, responsive learner UI.
+Secure authentication and onboarding.
+Consent-aware audio capture and storage.
+A provider-based pronunciation scoring architecture.
+Speech recognition and reference-audio services.
+Structured articulation content.
+Baseline assessments.
+A deterministic 12-week program engine.
+Daily guided practice.
+Progress tracking and retests.
+Honest before/after reports.
+Optional secure report sharing.
+Tamil and Arabic localization and target-language support where verified and implemented.
+Database migrations.
+Automated tests.
+CI configuration.
+Production deployment assets.
+Privacy and security documentation.
+Provider capability documentation.
+A real go-live checklist.
+An updated README, STATUS.md, and GO_LIVE_REPORT.md.
+
+Before declaring completion, provide:
+
+A concise summary of the implementation.
+The modules genuinely completed.
+The important changed files.
+Actual lint, test, build, and E2E command results.
+Provider support and configuration requirements.
+Database and object-storage setup requirements.
+Security and privacy controls implemented.
+Features blocked by missing credentials or external infrastructure.
+Outstanding expert, legal, device-testing, or operational approvals.
+The exact remaining tasks required before a real closed beta.
+
+START NOW: Inspect the existing repository, establish the baseline, create the implementation audit, and begin Module 1. Do not stop at planning. Implement, verify, document, and continue module by module. Be truthful about every result and every remaining limitation.

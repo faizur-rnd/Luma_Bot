@@ -1,12 +1,136 @@
 {
-  "version": "1.0.0",
+  "version": "1.1.0",
   "reviewStatus": "Draft, not yet reviewed",
   "modules": [
     {
+      "id": "mod_arabic_foundations",
+      "level": "Beginner",
+      "title": "Arabic Daily Essentials — أساسيات العربية اليومية",
+      "description": "Foundational spoken Arabic for everyday greetings, hospitality, and daily life",
+      "language": "ar",
+      "reviewStatus": "Draft, not yet reviewed",
+      "lessons": [
+        {
+          "id": "lesson_ar_01",
+          "title": "Greetings & Polite Etiquette — التَّحِيَّاتُ وَالتَّعَارُف",
+          "scenario": "Meeting a friend, neighbor, or host in an Arabic-speaking city for the first time.",
+          "level": "Beginner",
+          "language": "ar",
+          "durationMinutes": 15,
+          "objective": "Master foundational Arabic greetings, reciprocal pleasantries, and introducing yourself",
+          "samplePhrases": [
+            "السَّلَامُ عَلَيْكُمْ — وَعَلَيْكُمُ السَّلَام",
+            "أَهْلًا وَسَهْلًا، تَشَرَّفْنَا بِمَعْرِفَتِكَ",
+            "كَيْفَ حَالُكَ اليَوْم؟ — بِخَيْرٍ، الحَمْدُ لِلَّه",
+            "مَا اسْمُكَ؟ — اِسْمِي..."
+          ],
+          "transliterations": [
+            "As-salāmu ʿalaykum — Wa ʿalaykumu s-salām",
+            "Ahlan wa sahlan, tasharrafnā bi-maʿrifatik",
+            "Kayfa ḥāluk al-yawm? — Bi-khayr, al-ḥamdu lillāh",
+            "Mā ismuk? — Ismī..."
+          ],
+          "bridgeNotes": {
+            "en": "In Arabic culture, greetings are warm and reciprocal. Always respond to 'As-salamu alaykum' with 'Wa alaykumu s-salam'.",
+            "ta": "அரபு கலாச்சாரத்தில் முகமன் கூறுவது மிக முக்கியம். ஸலாம் கூறும்போது அதே அன்போடு பதிலளிக்க வேண்டும்."
+          },
+          "reviewStatus": "Draft, not yet reviewed"
+        },
+        {
+          "id": "lesson_ar_02",
+          "title": "At the Traditional Cafe — فِي المَقْهَى التَّقْلِيدِيّ",
+          "scenario": "You are at a local cafe in Cairo or Amman ordering traditional drinks and a pastry.",
+          "level": "Beginner",
+          "language": "ar",
+          "durationMinutes": 15,
+          "objective": "Practice ordering coffee, tea, clarifying sweetness preferences, and asking for the bill",
+          "samplePhrases": [
+            "مِنْ فَضْلِكَ، أُرِيدُ فِنْجَانَ قَهْوَةٍ عَرَبِيَّة",
+            "هَلْ عِنْدَكُمْ شَايٌ بِالنَّعْنَاعِ الأَخْضَر؟",
+            "بِدُونِ سُكَّر، لَوْ سَمَحْت",
+            "كَمِ الحِسَابُ، مِنْ فَضْلِك؟ — شُكْرًا جَزِيلًا"
+          ],
+          "transliterations": [
+            "Min faḍlik, urīdu finjāna qahwah ʿarabiyyah",
+            "Hal ʿindakum shāy bi-n-naʿnāʿ al-akhḍar?",
+            "Bi-dūni sukkar, law samaḥt",
+            "Kam al-ḥisāb, min faḍlik? — Shukran jazīlan"
+          ],
+          "bridgeNotes": {
+            "en": "Use 'min fadlik' (please) when requesting, and 'shukran jazilan' (thank you very much) when served.",
+            "ta": "காபி அல்லது தேநீர் ஆர்டர் செய்யும் போது 'மின் ஃபள்லிக்' (தயவுசெய்து) என்று தொடங்குவது மரபு."
+          },
+          "reviewStatus": "Draft, not yet reviewed"
+        },
+        {
+          "id": "lesson_ar_03",
+          "title": "Directions & City Life — فِي السُّوقِ وَالاتِّجَاهَات",
+          "scenario": "You are navigating a bustling historic souq and asking a local for directions to the market plaza.",
+          "level": "Beginner",
+          "language": "ar",
+          "durationMinutes": 15,
+          "objective": "Ask for directions, understand left/right/straight cues, and practice polite inquiries",
+          "samplePhrases": [
+            "عَفْوًا، أَيْنَ المَتْحَفُ الوَطَنِيّ؟",
+            "هَلْ هُوَ قَرِيبٌ مِنْ هُنَا؟",
+            "اِتَّجِهْ يَمِينًا ثُمَّ إِلَى الأَمَام",
+            "جَزَاكَ اللَّهُ خَيْرًا عَلَى المُسَاعَدَة"
+          ],
+          "transliterations": [
+            "ʿAfwan, ayna l-matḥaf al-waṭanī?",
+            "Hal huwa qarībun min hunā?",
+            "Ittajih yamīnan thumma ilā l-amām",
+            "Jazāka Llāhu khayran ʿalā l-musāʿadah"
+          ],
+          "bridgeNotes": {
+            "en": "Yamīnan means right, Yasāran means left, and Ilā l-amām means straight ahead.",
+            "ta": "யமீனன் என்றால் வலது, யசாரன் என்றால் இடது, இலா அல்-அமாம் என்றால் நேராக."
+          },
+          "reviewStatus": "Draft, not yet reviewed"
+        }
+      ]
+    },
+    {
+      "id": "mod_arabic_intermediate",
+      "level": "Intermediate",
+      "title": "Hospitality & Conversation — الضِّيَافَةُ وَالحِوَار",
+      "description": "Expressing opinions, welcoming guests, and sharing personal experiences in Arabic",
+      "language": "ar",
+      "reviewStatus": "Draft, not yet reviewed",
+      "lessons": [
+        {
+          "id": "lesson_ar_04",
+          "title": "Welcoming Guests & Hospitality — كَرَمُ الضِّيَافَة",
+          "scenario": "You are hosting friends at your home for an evening gathering.",
+          "level": "Intermediate",
+          "language": "ar",
+          "durationMinutes": 20,
+          "objective": "Practice traditional expressions of Arabic hospitality and offering refreshments",
+          "samplePhrases": [
+            "أَهْلًا وَمَرْحَبًا بِكُمْ فِي بَيْتِنَا",
+            "تَفَضَّلُوا، البَيْتُ بَيْتُكُمْ",
+            "مَا رَأْيُكُمْ فِي تَجْرِبَةِ هَذَا الطَّبَقِ التَّقْلِيدِيّ؟",
+            "شَرَّفْتُمُونَا بِهَذِهِ الزِّيَارَةِ الكَرِيمَة"
+          ],
+          "transliterations": [
+            "Ahlan wa marḥaban bikum fī baytinā",
+            "Tafaḍḍalū, al-baytu baytukum",
+            "Mā raʾyukum fī tajribati hādhā ṭ-ṭabaqi t-taqlīdī?",
+            "Sharraftumūnā bi-hādhihi z-ziyārati l-karīmah"
+          ],
+          "bridgeNotes": {
+            "en": "'Al-baytu baytukum' (our home is your home) is a timeless Arabian expression of profound hospitality."
+          },
+          "reviewStatus": "Draft, not yet reviewed"
+        }
+      ]
+    },
+    {
       "id": "mod_beginner_everyday",
       "level": "Beginner",
-      "title": "Everyday Essentials",
+      "title": "Everyday Essentials (English)",
       "description": "Foundational spoken interactions for daily life",
+      "language": "en",
       "reviewStatus": "Draft, not yet reviewed",
       "lessons": [
         {
@@ -22,7 +146,8 @@
             "How much does that come to?"
           ],
           "bridgeNotes": {
-            "ta": "கஃபேவில் மரியாதையாக காபி ஆர்டர் செய்யும் உரையாடல்."
+            "ta": "கஃபேவில் மரியாதையாக காபி ஆர்டர் செய்யும் உரையாடல்.",
+            "ar": "طلب قهوة بأدب في مقهى محلي."
           },
           "reviewStatus": "Draft, not yet reviewed"
         },
@@ -39,7 +164,8 @@
             "Thank you for your help!"
           ],
           "bridgeNotes": {
-            "ta": "வழி கேட்கும் அடிப்படை வாக்கியங்கள்."
+            "ta": "வழி கேட்கும் அடிப்படை வாக்கியங்கள்.",
+            "ar": "السؤال عن الاتجاهات وفهم الإرشادات."
           },
           "reviewStatus": "Draft, not yet reviewed"
         },
@@ -64,6 +190,7 @@
       "level": "Intermediate",
       "title": "Workplace & Collaboration",
       "description": "Clear and polite communication in professional settings",
+      "language": "en",
       "reviewStatus": "Draft, not yet reviewed",
       "lessons": [
         {
@@ -101,6 +228,7 @@
       "level": "Advanced",
       "title": "Persuasion & Discussion",
       "description": "Expressing opinions, nuance, and constructive feedback",
+      "language": "en",
       "reviewStatus": "Draft, not yet reviewed",
       "lessons": [
         {

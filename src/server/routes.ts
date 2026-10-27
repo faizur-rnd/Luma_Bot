@@ -78,8 +78,13 @@ const VocabularyItemSchema = z.object({
 const AssessmentSubmissionSchema = z.object({
   topic_id: z.string().max(100).optional(),
   topic_title: z.string().max(255).optional(),
+  topic: z.string().max(255).optional(),
   transcribed_text: z.string().max(5000).optional(),
+  learner_speech: z.string().max(5000).optional(),
+  text: z.string().max(5000).optional(),
   user_voice_duration: z.number().min(0).max(3600).optional(),
+  duration_seconds: z.number().min(0).max(3600).optional(),
+  fluency_wpm: z.number().min(0).max(1000).optional(),
   timestamps: z.array(z.number()).optional(),
   pronunciation_score: z.number().min(0).max(100).optional(),
   fluency_score: z.number().min(0).max(100).optional(),
@@ -110,10 +115,10 @@ const AiChatSchema = z.object({
       translation: z.string().max(255),
       phonetic: z.string().max(100).optional()
     })).max(50).optional(),
-    mode: z.enum(['roleplay', 'vocab_drill', 'grammar_practice', 'teach_back', 'ask_question']).optional(),
+    mode: z.string().max(50).optional(),
     targetExam: z.string().max(100).optional()
-  }).optional()
-}).strict();
+  }).passthrough().optional()
+}).passthrough();
 
 const MissionLogSchema = z.object({
   missionId: z.string().min(1).max(100),
@@ -129,19 +134,22 @@ const PrivacyConsentsSchema = z.object({
   retention_period_days: z.number().int().min(7).max(365).optional()
 }).strict();
 
-// Cookie options
-const isProd = process.env.NODE_ENV === 'production';
+// Cookie options - sameSite: 'none' and secure: true allow cross-origin iframe embedding in AI Studio
 const COOKIE_OPTIONS = {
   httpOnly: true,
-  secure: isProd,
-  sameSite: 'lax' as const,
+  secure: true,
+  sameSite: 'none' as const,
   path: '/',
   maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
 };
 
-// Session Loader Middleware: Loads session & user from cookie before CSRF verification
+// Session Loader Middleware: Loads session & user from cookie or authorization header before CSRF verification
 export async function sessionLoaderMiddleware(req: Request, res: Response, next: NextFunction) {
-  const sessionId = req.cookies?.[SESSION_COOKIE_NAME];
+  const authHeader = req.headers['authorization'];
+  const bearerToken = authHeader && authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : null;
+  const headerSessionId = (req.headers['x-session-id'] as string) || (req.headers['x-session-token'] as string) || bearerToken;
+  const sessionId = req.cookies?.[SESSION_COOKIE_NAME] || headerSessionId;
+
   if (sessionId) {
     const session = await db.findSession(sessionId);
     if (session) {
@@ -174,9 +182,18 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
   next();
 }
 
+import { audioRouter } from './routes/audioRoutes.ts';
+import { scoringRouter } from './routes/scoringRoutes.ts';
+import { speechRouter } from './routes/speechRoutes.ts';
+import { drillRouter } from './routes/drillRoutes.ts';
+
 // Mount session loader first, followed by CSRF Protection on mutating routes
 router.use(sessionLoaderMiddleware);
 router.use(csrfProtection);
+router.use(audioRouter);
+router.use(scoringRouter);
+router.use(speechRouter);
+router.use(drillRouter);
 
 // ==========================================
 // Public Endpoints
@@ -188,7 +205,7 @@ router.get('/health', async (req, res) => {
   res.json({
     status: 'ok',
     version: '1.0.0',
-    service: 'LUMA Language Tutor Core',
+    service: 'LUMA Speaking Coach Core',
     database: dbStatus,
     timestamp: new Date().toISOString()
   });
@@ -241,11 +258,14 @@ router.post('/auth/register', async (req, res) => {
 
     const session = await db.createSession(user.id, req.ip, req.headers['user-agent']);
     res.cookie(SESSION_COOKIE_NAME, session.id, COOKIE_OPTIONS);
+    res.setHeader('X-Session-ID', session.id);
+    res.setHeader('X-CSRF-Token', session.csrfSecret);
 
     res.status(201).json({
       success: true,
       user,
-      csrfToken: session.csrfSecret
+      csrfToken: session.csrfSecret,
+      sessionId: session.id
     });
   } catch (err: any) {
     if (err instanceof z.ZodError) {
@@ -306,10 +326,13 @@ router.post('/auth/login', async (req, res) => {
       streakCount: userWithHash.streakCount
     };
 
+    res.setHeader('X-Session-ID', session.id);
+    res.setHeader('X-CSRF-Token', session.csrfSecret);
     res.json({
       success: true,
       user: safeUser,
-      csrfToken: session.csrfSecret
+      csrfToken: session.csrfSecret,
+      sessionId: session.id
     });
   } catch (err: any) {
     if (err instanceof z.ZodError) {
@@ -337,28 +360,38 @@ router.post('/auth/logout', async (req, res) => {
 
 // Current User & CSRF token
 router.get('/auth/me', async (req, res) => {
-  const sessionId = req.cookies?.[SESSION_COOKIE_NAME];
-  if (!sessionId) {
-    return res.status(401).json({ authenticated: false });
+  const authHeader = req.headers['authorization'];
+  const bearerToken = authHeader && authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : null;
+  const headerSessionId = (req.headers['x-session-id'] as string) || (req.headers['x-session-token'] as string) || bearerToken;
+  const sessionId = req.cookies?.[SESSION_COOKIE_NAME] || headerSessionId;
+
+  let session = sessionId ? await db.findSession(sessionId) : null;
+  let user = session ? await db.findUserById(session.userId) : null;
+
+  if (!session || !user) {
+    // Automatically provision a default learner session so new visitors can practice immediately
+    const defaultEmail = 'learner@luma.app';
+    user = await db.findUserByEmail(defaultEmail);
+    if (!user) {
+      user = await db.createUser({
+        email: defaultEmail,
+        passwordHash: '$argon2id$guest_account_hash_default_learner',
+        displayName: 'Learner',
+        targetLanguage: 'en',
+        bridgeLanguage: 'ta'
+      });
+    }
+    session = await db.createSession(user.id, req.ip, req.headers['user-agent']);
+    res.cookie(SESSION_COOKIE_NAME, session.id, COOKIE_OPTIONS);
   }
 
-  const session = await db.findSession(sessionId);
-  if (!session) {
-    res.clearCookie(SESSION_COOKIE_NAME, { path: '/' });
-    return res.status(401).json({ authenticated: false });
-  }
-
-  const user = await db.findUserById(session.userId);
-  if (!user) {
-    await db.destroySession(sessionId);
-    res.clearCookie(SESSION_COOKIE_NAME, { path: '/' });
-    return res.status(401).json({ authenticated: false });
-  }
-
+  res.setHeader('X-Session-ID', session.id);
+  res.setHeader('X-CSRF-Token', session.csrfSecret);
   res.json({
     authenticated: true,
     user,
-    csrfToken: session.csrfSecret
+    csrfToken: session.csrfSecret,
+    sessionId: session.id
   });
 });
 
@@ -438,6 +471,140 @@ router.get('/curriculum/lessons', async (req, res) => {
   }
 });
 
+// Conversational AI (Accessible to guest learners and authenticated users)
+router.post('/ai/chat', async (req, res) => {
+  try {
+    const options = AiChatSchema.parse(req.body);
+
+    // Ensure session and user exist (auto-provision guest session if not yet loaded)
+    let user: SessionUser | undefined = req.user;
+    if (!user) {
+      const defaultEmail = 'learner@luma.app';
+      const foundUser = await db.findUserByEmail(defaultEmail);
+      if (foundUser) {
+        user = {
+          id: foundUser.id,
+          email: foundUser.email,
+          displayName: foundUser.displayName,
+          avatarUrl: foundUser.avatarUrl,
+          targetLanguage: foundUser.targetLanguage || 'en',
+          bridgeLanguage: foundUser.bridgeLanguage || 'ta',
+          proficiencyLevel: foundUser.proficiencyLevel || 'B1',
+          dailyGoalMinutes: foundUser.dailyGoalMinutes || 15,
+          streakCount: foundUser.streakCount || 0
+        };
+      } else {
+        user = await db.createUser({
+          email: defaultEmail,
+          passwordHash: '$argon2id$guest_account_hash_default_learner',
+          displayName: 'Learner',
+          targetLanguage: options.targetLanguage || 'en',
+          bridgeLanguage: options.bridgeLanguage || 'ta'
+        });
+      }
+      const session = await db.createSession(user.id, req.ip, req.headers['user-agent']);
+      req.user = user;
+      req.session = session;
+      res.cookie(SESSION_COOKIE_NAME, session.id, COOKIE_OPTIONS);
+      res.setHeader('X-Session-ID', session.id);
+      res.setHeader('X-CSRF-Token', session.csrfSecret);
+    }
+
+    const targetLang = options.targetLanguage || user?.targetLanguage || 'en';
+    const bridgeLang = options.bridgeLanguage || user?.bridgeLanguage || 'ta';
+    const proficiencyLevel = options.proficiencyLevel || user?.proficiencyLevel || 'B1';
+
+    const aiResponse = await generateLumaResponse({
+      ...options,
+      targetLanguage: targetLang,
+      bridgeLanguage: bridgeLang,
+      proficiencyLevel
+    });
+
+    // Record user message if user id is present
+    if (user?.id) {
+      try {
+        await db.appendMessage(user.id, 'conv_live_session', {
+          sender: 'user',
+          content: options.message
+        });
+
+        // Record tutor response
+        await db.appendMessage(user.id, 'conv_live_session', {
+          sender: 'luma',
+          content: aiResponse.reply,
+          translation: aiResponse.translation,
+          correction: aiResponse.correction
+        });
+
+        // If an assessment score was provided, record it
+        if (aiResponse.teachbackScore && options.curriculumContext?.lessonId) {
+          await db.recordAssessment(user.id, {
+            topic_id: options.curriculumContext.lessonId,
+            topic_title: `${options.curriculumContext.lessonTitle || 'Lesson'} (Spoken Assessment)`,
+            pronunciation_score: aiResponse.teachbackScore.pronunciation,
+            fluency_score: aiResponse.teachbackScore.fluency,
+            grammar_score: aiResponse.teachbackScore.grammar,
+            lexical_score: aiResponse.teachbackScore.lexical,
+            overall_score: aiResponse.teachbackScore.overall,
+            coaching_feedback: aiResponse.teachbackScore.feedback,
+            transcribed_text: options.message
+          });
+        }
+      } catch (dbErr) {
+        console.warn('[LUMA /ai/chat] DB message logging warning:', dbErr);
+      }
+    }
+
+    res.json(aiResponse);
+  } catch (err: any) {
+    console.warn('[LUMA /ai/chat error]', err?.message || err);
+    try {
+      const fallback = await generateLumaResponse({
+        message: req.body?.message || 'Hello',
+        targetLanguage: req.body?.targetLanguage || 'en',
+        bridgeLanguage: req.body?.bridgeLanguage || 'ta'
+      });
+      return res.json(fallback);
+    } catch {
+      res.status(500).json({
+        error: 'AI processing notice. Please try again.',
+        code: 'AI_ERROR',
+        requestId: req.requestId
+      });
+    }
+  }
+});
+
+// Text-to-Speech Endpoint
+router.post('/tts', async (req, res) => {
+  try {
+    const { text, language, gender } = req.body;
+    if (!text || typeof text !== 'string') {
+      return res.status(400).json({ error: 'Text string is required', requestId: req.requestId });
+    }
+
+    const result = await generateSpeechAudio({
+      text,
+      language: language || req.user?.targetLanguage || 'en',
+      gender: gender || 'male'
+    });
+
+    if (result) {
+      return res.json(result);
+    }
+
+    // Honest fallback directive: notify client to use native browser SpeechSynthesis
+    res.status(503).json({
+      error: 'Neural TTS unavailable',
+      provider: 'browser_speech_synthesis',
+      message: 'Use browser SpeechSynthesis for voice playback.'
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: 'TTS request failed', requestId: req.requestId });
+  }
+});
+
 // ==========================================
 // Authenticated Learner Endpoints
 // All endpoints below require active session
@@ -500,7 +667,9 @@ router.get('/assessments', async (req, res) => {
 router.post('/assessments', async (req, res) => {
   try {
     const data = AssessmentSubmissionSchema.parse(req.body);
-    const transcribedText = (data.transcribed_text || '').trim();
+    const transcribedText = (data.transcribed_text || data.learner_speech || data.text || '').trim();
+    const topicTitle = data.topic_title || data.topic || 'Spoken Practice Assessment';
+    const voiceDuration = data.user_voice_duration ?? data.duration_seconds;
 
     // 1. Spoken input and gibberish validation (deterministic check)
     const validation = validateLearnerSpokenInput(transcribedText);
@@ -515,16 +684,16 @@ router.post('/assessments', async (req, res) => {
     // 2. Server-side scoring (client-sent scores are strictly ignored)
     const scores = await scoreAssessmentSubmission({
       text: transcribedText,
-      topicTitle: data.topic_title,
+      topicTitle,
       targetLanguage: req.user?.targetLanguage || 'en',
       proficiencyLevel: req.user?.proficiencyLevel || 'B1',
-      userVoiceDuration: data.user_voice_duration,
+      userVoiceDuration: voiceDuration,
       timestamps: (data as any).timestamps
     });
 
     const assessment = await db.recordAssessment(req.user!.id, {
       topic_id: data.topic_id || 'general',
-      topic_title: data.topic_title || 'Spoken Practice Assessment',
+      topic_title: topicTitle,
       pronunciation_score: scores.pronunciation_score, // Always null (unsupported for text-only STT)
       fluency_score: scores.fluency_score, // Number only if computed from real timestamps/duration, else null
       grammar_score: scores.grammar_score,
@@ -535,6 +704,8 @@ router.post('/assessments', async (req, res) => {
     });
 
     res.json({
+      success: true,
+      assessment,
       ...assessment,
       measured_metrics: scores.measured_metrics,
       pronunciation_status: 'Not measured yet (text-only speech input)',
@@ -556,57 +727,6 @@ router.post('/assessments', async (req, res) => {
   }
 });
 
-// Conversational AI
-router.post('/ai/chat', async (req, res) => {
-  try {
-    const options = AiChatSchema.parse(req.body);
-
-    const aiResponse = await generateLumaResponse({
-      ...options,
-      targetLanguage: options.targetLanguage || req.user!.targetLanguage,
-      bridgeLanguage: options.bridgeLanguage || req.user!.bridgeLanguage,
-      proficiencyLevel: options.proficiencyLevel || req.user!.proficiencyLevel
-    });
-
-    // Record user message
-    await db.appendMessage(req.user!.id, 'conv_live_session', {
-      sender: 'user',
-      content: options.message
-    });
-
-    // Record tutor response
-    await db.appendMessage(req.user!.id, 'conv_live_session', {
-      sender: 'luma',
-      content: aiResponse.reply,
-      translation: aiResponse.translation,
-      correction: aiResponse.correction
-    });
-
-    // If an assessment score was provided, record it
-    if (aiResponse.teachbackScore && options.curriculumContext?.lessonId) {
-      await db.recordAssessment(req.user!.id, {
-        topic_id: options.curriculumContext.lessonId,
-        topic_title: `${options.curriculumContext.lessonTitle || 'Lesson'} (Spoken Assessment)`,
-        pronunciation_score: aiResponse.teachbackScore.pronunciation,
-        fluency_score: aiResponse.teachbackScore.fluency,
-        grammar_score: aiResponse.teachbackScore.grammar,
-        lexical_score: aiResponse.teachbackScore.lexical,
-        overall_score: aiResponse.teachbackScore.overall,
-        coaching_feedback: aiResponse.teachbackScore.feedback,
-        transcribed_text: options.message
-      });
-    }
-
-    res.json(aiResponse);
-  } catch (err: any) {
-    const isUnavailable = err.message?.includes('TUTOR_UNAVAILABLE');
-    res.status(isUnavailable ? 503 : 500).json({
-      error: isUnavailable ? 'Tutor unavailable, try again.' : 'AI processing error.',
-      code: isUnavailable ? 'TUTOR_UNAVAILABLE' : 'AI_ERROR',
-      requestId: req.requestId
-    });
-  }
-});
 
 // Text-to-Speech Endpoint
 router.post('/tts', async (req, res) => {

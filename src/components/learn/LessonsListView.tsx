@@ -38,10 +38,12 @@ export const LessonsListView: React.FC<LessonsListViewProps> = ({ onStartLesson 
     return () => { active = false; };
   }, []);
 
-  const filtered = lessons.filter((l) => {
-    const matchesSearch = l.topic.toLowerCase().includes(search.toLowerCase()) ||
-      l.objective.toLowerCase().includes(search.toLowerCase());
-    const matchesLevel = selectedLevel === 'All' || l.level.toLowerCase() === selectedLevel.toLowerCase();
+  const filtered = lessons.filter((l: any) => {
+    const title = l.title || l.topic || '';
+    const obj = l.objective || '';
+    const matchesSearch = title.toLowerCase().includes(search.toLowerCase()) ||
+      obj.toLowerCase().includes(search.toLowerCase());
+    const matchesLevel = selectedLevel === 'All' || (l.level || '').toLowerCase() === selectedLevel.toLowerCase();
     return matchesSearch && matchesLevel;
   });
 
@@ -115,7 +117,7 @@ export const LessonsListView: React.FC<LessonsListViewProps> = ({ onStartLesson 
                   </span>
                 </div>
                 <h3 className="text-lg font-semibold text-[var(--text)] mb-1">
-                  {l.topic}
+                  {(l as any).title || (l as any).topic}
                 </h3>
                 <p className="text-sm text-[var(--muted)] line-clamp-2 mb-4">
                   {l.objective}
@@ -127,7 +129,7 @@ export const LessonsListView: React.FC<LessonsListViewProps> = ({ onStartLesson 
                 <Button
                   variant="primary"
                   fullWidth
-                  onClick={() => onStartLesson(l.id, l.topic)}
+                  onClick={() => onStartLesson(l.id, (l as any).title || (l as any).topic)}
                 >
                   Start practice
                 </Button>

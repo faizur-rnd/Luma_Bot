@@ -36,19 +36,24 @@ async function startServer() {
   app.set('trust proxy', 1);
   app.disable('x-powered-by');
 
-  // Security Headers via Helmet
+  // Security Headers via Helmet (configured to support AI Studio iframe embedding)
   app.use(
     helmet({
+      frameguard: false, // Required for AI Studio preview iframe embedding
+      crossOriginEmbedderPolicy: false,
+      crossOriginOpenerPolicy: false,
+      crossOriginResourcePolicy: false,
       contentSecurityPolicy: {
         directives: {
           defaultSrc: ["'self'"],
-          scriptSrc: ["'self'", "'unsafe-inline'"], // unsafe-inline for Vite development script tags
+          scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"], // unsafe-eval for Vite development
           styleSrc: ["'self'", "'unsafe-inline'"],
           fontSrc: ["'self'", 'data:'],
           imgSrc: ["'self'", 'data:', 'blob:', 'https:'],
-          connectSrc: ["'self'", 'https://generativelanguage.googleapis.com', 'blob:', 'data:'],
+          connectSrc: ["'self'", 'https://generativelanguage.googleapis.com', 'blob:', 'data:', 'ws:', 'wss:'],
           mediaSrc: ["'self'", 'blob:', 'data:'],
           objectSrc: ["'none'"],
+          frameAncestors: ['*'], // Allow embedding in Google AI Studio preview iframe
           baseUri: ["'self'"],
           formAction: ["'self'"],
           upgradeInsecureRequests: isProd ? [] : null
@@ -70,6 +75,10 @@ async function startServer() {
   app.use((req, res, next) => {
     const start = Date.now();
     res.on('finish', () => {
+      // Only log API requests or HTTP error statuses (>= 400) to keep console pristine and prevent static Vite asset logs
+      if (!req.originalUrl.startsWith('/api') && res.statusCode < 400) {
+        return;
+      }
       const duration = Date.now() - start;
       // Sanitize URL to avoid leaking query params
       const cleanUrl = req.originalUrl.split('?')[0];
@@ -139,6 +148,15 @@ async function startServer() {
 
   // Mount API Router
   app.use('/api', apiRouter);
+
+  // Catch unmatched /api routes so they never fall through to Vite HTML
+  app.all('/api/*', (req, res) => {
+    res.status(404).json({
+      error: `API route ${req.method} ${req.path} not found.`,
+      code: 'NOT_FOUND',
+      requestId: (req as any).requestId
+    });
+  });
 
   // Development vs Production serving
   if (isProd) {

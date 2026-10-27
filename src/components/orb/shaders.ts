@@ -1,196 +1,191 @@
-// WebGL GLSL Shaders for VoiceOrb Three.js Simulation
+// WebGL GLSL Shaders for ChatGPT-style Fluid Organic Voice Orb
+// Liquid iridescent morphing blob with dynamic audio reaction & chromatic radiance
 
-export const glassVertexShader = `
-  varying vec3 vNormal;
-  varying vec3 vViewPosition;
-  void main() {
-    vNormal = normalize(normalMatrix * normal);
-    vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
-    vViewPosition = -mvPosition.xyz;
-    gl_Position = projectionMatrix * mvPosition;
-  }
-`;
-
-export const glassFragmentShader = `
-  uniform vec3 uRimColor;
+export const chatgptOrbVertexShader = `
   uniform float uTime;
+  uniform float uAudio;
+  uniform float uDistortion;
+  uniform float uFrequency;
+  
   varying vec3 vNormal;
-  varying vec3 vViewPosition;
+  varying vec3 vPosition;
+  varying vec3 vWorldPosition;
+  varying float vDisplacement;
+  varying vec2 vUv;
+
+  // Optimized Simplex-style 3D Noise function
+  vec3 mod289(vec3 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
+  vec4 mod289(vec4 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
+  vec4 permute(vec4 x) { return mod289(((x * 34.0) + 1.0) * x); }
+  vec4 taylorInvSqrt(vec4 r) { return 1.79284291400159 - 0.85373472095314 * r; }
+
+  float snoise(vec3 v) {
+    const vec2 C = vec2(1.0 / 6.0, 1.0 / 3.0);
+    const vec4 D = vec4(0.0, 0.5, 1.0, 2.0);
+
+    vec3 i  = floor(v + dot(v, C.yyy));
+    vec3 x0 = v - i + dot(i, C.xxx);
+
+    vec3 g = step(x0.yzx, x0.xyz);
+    vec3 l = 1.0 - g;
+    vec3 i1 = min(g.xyz, l.zxy);
+    vec3 i2 = max(g.xyz, l.zxy);
+
+    vec3 x1 = x0 - i1 + C.xxx;
+    vec3 x2 = x0 - i2 + C.yyy;
+    vec3 x3 = x0 - D.yyy;
+
+    i = mod289(i);
+    vec4 p = permute(permute(permute(
+              i.z + vec4(0.0, i1.z, i2.z, 1.0))
+            + i.y + vec4(0.0, i1.y, i2.y, 1.0))
+            + i.x + vec4(0.0, i1.x, i2.x, 1.0));
+
+    float n_ = 0.142857142857;
+    vec3  ns = n_ * D.wyz - D.xzx;
+
+    vec4 j = p - 49.0 * floor(p * ns.z * ns.z);
+
+    vec4 x_ = floor(j * ns.z);
+    vec4 y_ = floor(j - 7.0 * x_);
+
+    vec4 x = x_ * ns.x + ns.yyyy;
+    vec4 y = y_ * ns.x + ns.yyyy;
+    vec4 h = 1.0 - abs(x) - abs(y);
+
+    vec4 b0 = vec4(x.xy, y.xy);
+    vec4 b1 = vec4(x.zw, y.zw);
+
+    vec4 s0 = floor(b0) * 2.0 + 1.0;
+    vec4 s1 = floor(b1) * 2.0 + 1.0;
+    vec4 sh = -step(h, vec4(0.0));
+
+    vec4 a0 = b0.xzyw + s0.xzyw * sh.xxyy;
+    vec4 a1 = b1.xzyw + s1.xzyw * sh.zzww;
+
+    vec3 p0 = vec3(a0.xy, h.x);
+    vec3 p1 = vec3(a0.zw, h.y);
+    vec3 p2 = vec3(a1.xy, h.z);
+    vec3 p3 = vec3(a1.zw, h.w);
+
+    vec4 norm = taylorInvSqrt(vec4(dot(p0, p0), dot(p1, p1), dot(p2, p2), dot(p3, p3)));
+    p0 *= norm.x;
+    p1 *= norm.y;
+    p2 *= norm.z;
+    p3 *= norm.w;
+
+    vec4 m = max(0.6 - vec4(dot(x0, x0), dot(x1, x1), dot(x2, x2), dot(x3, x3)), 0.0);
+    m = m * m;
+    return 42.0 * dot(m * m, vec4(dot(p0, x0), dot(p1, x1), dot(p2, x2), dot(p3, x3)));
+  }
 
   void main() {
-    vec3 N = normalize(vNormal);
-    vec3 V = normalize(vViewPosition);
-
-    // Deep Fresnel rim with glowing sapphire blue edge
-    float NdotV = max(0.0, dot(N, V));
-    float fresnel = 1.0 - NdotV;
+    vUv = uv;
+    vNormal = normalize(normalMatrix * normal);
     
-    // Razor sharp outer edge rim glow
-    float edgeRim = pow(fresnel, 4.2);
-    float softRim = pow(fresnel, 2.2) * 0.45;
+    // Multi-octave organic fluid undulation
+    vec3 noisePos = position * uFrequency + vec3(uTime * 0.45, uTime * 0.35, uTime * 0.25);
+    float n1 = snoise(noisePos);
+    float n2 = snoise(noisePos * 2.1 + vec3(-uTime * 0.3, uTime * 0.5, 0.0)) * 0.5;
+    float rawNoise = n1 + n2;
 
-    // Sapphire / electric blue rim blend
-    vec3 rimGlow = mix(uRimColor, vec3(0.38, 0.65, 1.0), edgeRim * 0.7) * (edgeRim * 1.9 + softRim * 0.6);
+    // Amplitude reacts organically to speech audio
+    float audioAmp = 1.0 + uAudio * 1.8;
+    float displacement = rawNoise * (uDistortion * 0.18) * audioAmp;
+    vDisplacement = displacement;
 
-    // Specular highlight near top-right of sphere
-    vec3 lightDirTop = normalize(vec3(0.28, 0.88, 0.45));
-    vec3 H = normalize(lightDirTop + V);
-    float specAngle = max(0.0, dot(N, H));
-    float specTop = pow(specAngle, 54.0) * 0.95;
-    float specHalo = pow(specAngle, 12.0) * 0.16;
+    vec3 newPosition = position + normal * displacement;
+    vPosition = newPosition;
+    
+    vec4 worldPos = modelMatrix * vec4(newPosition, 1.0);
+    vWorldPosition = worldPos.xyz;
 
-    // Secondary subtle blue rim reflection at lower contour
-    vec3 lightDirBottom = normalize(vec3(-0.35, -0.75, 0.5));
-    float specBottom = pow(max(0.0, dot(N, normalize(lightDirBottom + V))), 36.0) * 0.25;
-
-    // Transparent glass core
-    vec3 glassBase = vec3(0.005, 0.01, 0.025) * fresnel;
-    vec3 finalColor = glassBase + rimGlow + vec3(1.0, 1.0, 1.0) * specTop + vec3(0.5, 0.75, 1.0) * specHalo + vec3(0.2, 0.5, 0.9) * specBottom;
-
-    // Edge alpha with high transparency in center
-    float alpha = clamp(edgeRim * 0.95 + softRim * 0.35 + specTop * 0.9 + 0.05, 0.0, 0.98);
-
-    gl_FragColor = vec4(finalColor, alpha);
+    gl_Position = projectionMatrix * viewMatrix * worldPos;
   }
 `;
 
-export const haloVertexShader = `
-  varying vec3 vNormal;
-  varying vec3 vViewPosition;
-  void main() {
-    vNormal = normalize(normalMatrix * normal);
-    vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
-    vViewPosition = -mvPosition.xyz;
-    gl_Position = projectionMatrix * mvPosition;
-  }
-`;
+export const chatgptOrbFragmentShader = `
+  uniform float uTime;
+  uniform float uAudio;
+  uniform vec3 uColorCyan;
+  uniform vec3 uColorBlue;
+  uniform vec3 uColorViolet;
+  uniform vec3 uColorCore;
+  uniform float uIntensity;
 
-export const haloFragmentShader = `
-  uniform vec3 uColor;
   varying vec3 vNormal;
-  varying vec3 vViewPosition;
+  varying vec3 vPosition;
+  varying vec3 vWorldPosition;
+  varying float vDisplacement;
+  varying vec2 vUv;
+
   void main() {
     vec3 N = normalize(vNormal);
-    vec3 V = normalize(vViewPosition);
-    float fresnel = 1.0 - max(0.0, dot(N, V));
-    float halo = pow(fresnel, 5.0) * 0.6;
-    gl_FragColor = vec4(uColor * 1.3, halo);
-  }
-`;
+    vec3 V = normalize(cameraPosition - vWorldPosition);
 
-export const coreVertexShader = `
-  uniform float uTime;
-  uniform float uAudio;
-  varying vec3 vPosition;
-  varying vec3 vNormal;
-  varying vec2 vUv;
+    // Fresnel rim effect (characteristic of glowing fluid bubble)
+    float NdotV = max(0.0, dot(N, V));
+    float fresnel = pow(1.0 - NdotV, 2.8);
+    float rimGlow = pow(1.0 - NdotV, 4.5);
 
-  // Procedural 3D noise for organic plasma displacement
-  float hash(vec3 p) {
-    p = fract(p * 0.3183099 + 0.1);
-    p *= 17.0;
-    return fract(p.x * p.y * p.z * (p.x + p.y + p.z));
-  }
+    // Multi-gradient chromatic blending
+    // Flowing coordinates based on position and time
+    float colorFlow1 = sin(vPosition.y * 2.2 + vPosition.x * 1.5 + uTime * 0.8) * 0.5 + 0.5;
+    float colorFlow2 = cos(vPosition.z * 2.5 - vPosition.y * 1.8 + uTime * 0.6) * 0.5 + 0.5;
+    float colorFlow3 = sin(vDisplacement * 6.0 + uTime * 1.2) * 0.5 + 0.5;
 
-  float noise(vec3 x) {
-    vec3 i = floor(x);
-    vec3 f = fract(x);
-    f = f * f * (3.0 - 2.0 * f);
-    return mix(
-      mix(mix(hash(i + vec3(0,0,0)), hash(i + vec3(1,0,0)), f.x),
-          mix(hash(i + vec3(0,1,0)), hash(i + vec3(1,1,0)), f.x), f.y),
-      mix(mix(hash(i + vec3(0,0,1)), hash(i + vec3(1,0,1)), f.x),
-          mix(hash(i + vec3(0,1,1)), hash(i + vec3(1,1,1)), f.x), f.y), f.z);
-  }
+    // Liquid palette mixing (Cyan -> Electric Blue -> Deep Violet)
+    vec3 fluidColor = mix(uColorCyan, uColorBlue, colorFlow1);
+    fluidColor = mix(fluidColor, uColorViolet, colorFlow2 * 0.85);
 
-  void main() {
-    vPosition = position;
-    vNormal = normalize(normalMatrix * normal);
-    vUv = uv;
+    // Dynamic wave ripples from audio
+    float ripple = sin(vPosition.y * 6.0 - uTime * 3.0) * 0.5 + 0.5;
+    fluidColor += uColorCyan * ripple * uAudio * 0.45;
 
-    // Organic fluid displacement
-    float n = noise(position * 0.05 + vec3(uTime * 0.4, -uTime * 0.3, uTime * 0.2));
-    float displacement = (n - 0.5) * (14.0 + uAudio * 18.0);
-    vec3 displacedPos = position + normal * displacement;
+    // Luminous radiant white core
+    float coreBloom = pow(NdotV, 1.8);
+    vec3 finalColor = mix(fluidColor, uColorCore, coreBloom * 0.65);
 
-    gl_Position = projectionMatrix * modelViewMatrix * vec4(displacedPos, 1.0);
-  }
-`;
+    // Specular highlight to convey soft silky surface
+    vec3 lightDir = normalize(vec3(0.5, 0.8, 0.9));
+    vec3 H = normalize(lightDir + V);
+    float spec = pow(max(0.0, dot(N, H)), 32.0);
+    finalColor += vec3(1.0, 1.0, 1.0) * spec * 0.7;
 
-export const coreFragmentShader = `
-  uniform float uTime;
-  uniform float uAudio;
-  uniform float uMagentaWeight;
-  uniform float uAmberWeight;
-  uniform float uCyanWeight;
-  varying vec3 vPosition;
-  varying vec3 vNormal;
-  varying vec2 vUv;
+    // Iridescent rim glow
+    finalColor += mix(uColorCyan, uColorViolet, fresnel) * (fresnel * 1.2 + rimGlow * 1.5);
 
-  void main() {
-    // Normalize coordinates inside sphere (-1.0 to 1.0)
-    vec3 posNorm = vPosition / 50.0;
+    // Brightness boosted by audio state
+    finalColor *= (uIntensity + uAudio * 0.35);
 
-    // Gradient factors
-    float magentaFactor = clamp((-posNorm.x * 0.6 + posNorm.y * 0.7 + 0.5), 0.0, 1.0);
-    float amberFactor = clamp((posNorm.x * 0.7 - posNorm.y * 0.8 + 0.3), 0.0, 1.0);
-    float cyanFactor = clamp((posNorm.y * 0.4 + posNorm.z * 0.8 + 0.2), 0.0, 1.0);
-
-    vec3 colMagenta = vec3(0.85, 0.15, 0.95); // Neon Magenta
-    vec3 colViolet  = vec3(0.58, 0.20, 0.92); // Cosmic Violet
-    vec3 colAmber   = vec3(0.96, 0.62, 0.08); // Golden Amber
-    vec3 colCyan    = vec3(0.12, 0.80, 0.98); // Soft Cyan
-
-    // Mix base nebula colors
-    vec3 nebula = mix(colViolet, colMagenta, magentaFactor) * uMagentaWeight;
-    nebula = mix(nebula, colAmber, amberFactor * 0.85 * uAmberWeight);
-    nebula += colCyan * (cyanFactor * 0.4 * uCyanWeight);
-
-    // Fresnel falloff for internal volumetric softness
-    float fresnel = pow(1.0 - abs(dot(vNormal, vec3(0.0, 0.0, 1.0))), 2.0);
-    float centerBloom = 1.0 - length(posNorm) * 0.5;
-
-    // Audio intensity pulse
-    float intensity = (0.75 + uAudio * 0.65) * (1.0 + fresnel * 0.8);
-    vec3 finalColor = nebula * intensity;
-
-    // Luminous translucent alpha
-    float alpha = clamp(0.42 * centerBloom + fresnel * 0.45 + uAudio * 0.25, 0.0, 0.88);
+    // Soft feathered alpha at outer edges
+    float alpha = clamp(0.85 + fresnel * 0.15 + uAudio * 0.1, 0.0, 1.0);
 
     gl_FragColor = vec4(finalColor, alpha);
   }
 `;
 
-export const tendrilVertexShader = `
-  varying vec2 vUv;
-  varying vec3 vPos;
+export const chatgptGlowVertexShader = `
+  varying vec3 vNormal;
+  varying vec3 vPosition;
   void main() {
-    vUv = uv;
-    vPos = position;
+    vNormal = normalize(normalMatrix * normal);
+    vPosition = position;
     gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
   }
 `;
 
-export const tendrilFragmentShader = `
-  uniform vec3 uCoreColor;
-  uniform vec3 uEdgeColor;
-  uniform float uIntensity;
+export const chatgptGlowFragmentShader = `
+  uniform vec3 uGlowColor;
   uniform float uAudio;
-  varying vec2 vUv;
-  varying vec3 vPos;
+  uniform float uPulse;
+  varying vec3 vNormal;
+  varying vec3 vPosition;
 
   void main() {
-    float distCenter = abs(vUv.y - 0.5) * 2.0;
-    float taper = sin(vUv.x * 3.14159);
-    taper = pow(max(0.0, taper), 0.7);
-
-    vec3 coreWhite = vec3(1.0, 1.0, 1.0);
-    vec3 col = mix(coreWhite, uCoreColor, smoothstep(0.0, 0.35, distCenter));
-    col = mix(col, uEdgeColor, smoothstep(0.35, 1.0, distCenter));
-
-    float alpha = pow(1.0 - distCenter, 1.4) * taper * 0.95 * uIntensity;
-    alpha *= (1.0 + uAudio * 0.4);
-
-    gl_FragColor = vec4(col * (1.3 + uAudio * 0.5), alpha);
+    float viewDot = dot(normalize(vNormal), vec3(0.0, 0.0, 1.0));
+    float halo = pow(1.0 - abs(viewDot), 3.2);
+    float intensity = halo * (0.4 + uAudio * 0.35 + uPulse * 0.15);
+    gl_FragColor = vec4(uGlowColor * 1.4, intensity);
   }
 `;

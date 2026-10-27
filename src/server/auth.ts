@@ -129,8 +129,12 @@ export function csrfProtection(req: Request, res: Response, next: NextFunction) 
       .map(o => o.trim())
       .filter(Boolean);
 
-    const isSameHost = host && originUrl.host === host;
-    const isExplicitlyAllowed = envAllowed.includes(originUrl.origin);
+    const forwardedHost = (req.headers['x-forwarded-host'] as string)?.split(',')[0]?.trim();
+    const isSameHost = (host && originUrl.host === host) || (forwardedHost && originUrl.host === forwardedHost);
+    const isExplicitlyAllowed = envAllowed.includes(originUrl.origin) || Boolean(process.env.APP_URL && originUrl.origin.includes(process.env.APP_URL));
+    const isAiStudioDomain = originUrl.hostname.endsWith('.run.app') ||
+                             originUrl.hostname.endsWith('.google.com') ||
+                             originUrl.hostname.endsWith('.googleusercontent.com');
     const isDevLocalhost = process.env.NODE_ENV !== 'production' && (
       originUrl.origin === 'http://localhost:3000' ||
       originUrl.origin === 'http://127.0.0.1:3000' ||
@@ -140,7 +144,7 @@ export function csrfProtection(req: Request, res: Response, next: NextFunction) 
       originUrl.hostname === 'localhost'
     );
 
-    if (!isSameHost && !isExplicitlyAllowed && !isDevLocalhost) {
+    if (!isSameHost && !isExplicitlyAllowed && !isDevLocalhost && !isAiStudioDomain) {
       return res.status(403).json({
         error: 'Cross-origin request rejected.',
         code: 'ORIGIN_FORBIDDEN',
@@ -155,13 +159,15 @@ export function csrfProtection(req: Request, res: Response, next: NextFunction) 
     });
   }
 
-  // Exempt public auth routes from CSRF token (they don't have a session yet)
+  // Exempt public auth and conversational AI generation routes from CSRF token (they validate Origin)
   const targetPath = (req.originalUrl ? req.originalUrl.split('?')[0] : req.path);
   const exemptPaths = [
     '/api/auth/login', '/auth/login',
     '/api/auth/register', '/auth/register',
     '/api/auth/forgot-password', '/auth/forgot-password',
-    '/api/auth/reset-password', '/auth/reset-password'
+    '/api/auth/reset-password', '/auth/reset-password',
+    '/api/ai/chat', '/ai/chat',
+    '/api/tts', '/tts'
   ];
   if (exemptPaths.includes(targetPath) || exemptPaths.includes(req.path)) {
     return next();

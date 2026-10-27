@@ -13,21 +13,22 @@ interface SettingsModalProps {
 }
 
 const LANGUAGES_SPOKEN = [
-  { code: 'en', name: 'English' },
-  { code: 'es', name: 'Spanish' },
-  { code: 'fr', name: 'French' },
-  { code: 'de', name: 'German' },
-  { code: 'ar', name: 'Arabic' },
-  { code: 'ta', name: 'Tamil' },
-  { code: 'hi', name: 'Hindi' }
+  { code: 'en', name: 'English (English)' },
+  { code: 'ar', name: 'Arabic (العربية)' },
+  { code: 'es', name: 'Spanish (Español)' },
+  { code: 'ta', name: 'Tamil (தமிழ்)' },
+  { code: 'hi', name: 'Hindi (हिन्दी)' },
+  { code: 'de', name: 'German (Deutsch)' },
+  { code: 'fr', name: 'French (Français)' }
 ];
 
 const LANGUAGES_TO_LEARN = [
-  { code: 'es', name: 'Spanish' },
-  { code: 'fr', name: 'French' },
-  { code: 'de', name: 'German' },
-  { code: 'ja', name: 'Japanese' },
-  { code: 'en', name: 'English' }
+  { code: 'ar', name: 'Arabic (العربية الفصحى)' },
+  { code: 'en', name: 'English' },
+  { code: 'es', name: 'Spanish (Español)' },
+  { code: 'de', name: 'German (Deutsch)' },
+  { code: 'fr', name: 'French (Français)' },
+  { code: 'ja', name: 'Japanese (日本語)' }
 ];
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({
@@ -168,6 +169,45 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   <option key={l.code} value={l.code}>{l.name}</option>
                 ))}
               </select>
+            </div>
+
+            {/* Coach Voice Gender Selection */}
+            <div>
+              <label className="text-sm font-semibold text-[var(--text)] block mb-1.5">
+                Coach Voice
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    localStorage.setItem('luma_ice_voice_gender', 'female');
+                    setMsg({ text: 'Preferred voice set to Female Coach.', ok: true });
+                  }}
+                  className={`py-2 px-3 rounded-xl border text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                    (localStorage.getItem('luma_ice_voice_gender') || 'female') === 'female'
+                      ? 'bg-purple-600 text-white border-purple-500 shadow-md'
+                      : 'bg-[var(--surface-2)] text-[var(--muted)] border-[var(--border)] hover:text-[var(--text)]'
+                  }`}
+                >
+                  <span>♀</span>
+                  <span>Female Coach</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    localStorage.setItem('luma_ice_voice_gender', 'male');
+                    setMsg({ text: 'Preferred voice set to Male Coach.', ok: true });
+                  }}
+                  className={`py-2 px-3 rounded-xl border text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                    localStorage.getItem('luma_ice_voice_gender') === 'male'
+                      ? 'bg-cyan-600 text-white border-cyan-500 shadow-md'
+                      : 'bg-[var(--surface-2)] text-[var(--muted)] border-[var(--border)] hover:text-[var(--text)]'
+                  }`}
+                >
+                  <span>♂</span>
+                  <span>Male Coach</span>
+                </button>
+              </div>
             </div>
 
             {/* Theme switcher */}

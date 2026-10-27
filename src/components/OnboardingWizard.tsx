@@ -10,23 +10,24 @@ interface OnboardingWizardProps {
 const STORAGE_KEY = 'luma_onboarding_step_state';
 
 const LANGUAGES_SPOKEN = [
-  { code: 'en', name: 'English' },
-  { code: 'es', name: 'Spanish' },
-  { code: 'fr', name: 'French' },
-  { code: 'de', name: 'German' },
-  { code: 'ar', name: 'Arabic' },
-  { code: 'ta', name: 'Tamil' },
-  { code: 'hi', name: 'Hindi' },
-  { code: 'ja', name: 'Japanese' }
+  { code: 'en', name: 'English', native: 'English' },
+  { code: 'ar', name: 'Arabic', native: 'العربية' },
+  { code: 'es', name: 'Spanish', native: 'Español' },
+  { code: 'ta', name: 'Tamil', native: 'தமிழ்' },
+  { code: 'hi', name: 'Hindi', native: 'हिन्दी' },
+  { code: 'de', name: 'German', native: 'Deutsch' },
+  { code: 'fr', name: 'French', native: 'Français' },
+  { code: 'ja', name: 'Japanese', native: '日本語' }
 ];
 
 const LANGUAGES_TO_LEARN = [
-  { code: 'es', name: 'Spanish' },
-  { code: 'fr', name: 'French' },
-  { code: 'de', name: 'German' },
-  { code: 'ja', name: 'Japanese' },
-  { code: 'en', name: 'English' },
-  { code: 'it', name: 'Italian' }
+  { code: 'ar', name: 'Arabic (العربية)', native: 'العربية الفصحى', flag: '🇸🇦' },
+  { code: 'en', name: 'English', native: 'English', flag: '🇬🇧' },
+  { code: 'es', name: 'Spanish', native: 'Español', flag: '🇪🇸' },
+  { code: 'de', name: 'German', native: 'Deutsch', flag: '🇩🇪' },
+  { code: 'fr', name: 'French', native: 'Français', flag: '🇫🇷' },
+  { code: 'ja', name: 'Japanese', native: '日本語', flag: '🇯🇵' },
+  { code: 'it', name: 'Italian', native: 'Italiano', flag: '🇮🇹' }
 ];
 
 const LEVELS = [
@@ -180,7 +181,11 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ onComplete, 
                     : 'border-[var(--border)] bg-[var(--surface)] text-[var(--muted)] hover:border-[var(--accent)]'
                 }`}
               >
-                {lang.name}
+                <div className="flex items-center justify-between w-full">
+                  <span>{lang.name}</span>
+                  {lang.flag && <span className="text-base" aria-hidden="true">{lang.flag}</span>}
+                </div>
+                {lang.native && <div className="text-xs text-[var(--muted)] mt-0.5">{lang.native}</div>}
               </button>
             ))}
           </div>

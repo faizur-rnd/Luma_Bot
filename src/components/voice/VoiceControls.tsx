@@ -2,11 +2,13 @@ import React, { useState } from 'react';
 import { Mic, MicOff, MessageSquare, Send, RotateCcw, Gauge } from 'lucide-react';
 import { VoiceSessionState } from '../orb/types.ts';
 import { Button } from '../ui/Button.tsx';
+import { AudioWaveVisualizer } from '../audio/AudioWaveVisualizer.tsx';
 
 interface VoiceControlsProps {
   orbState: VoiceSessionState;
   isListening: boolean;
   isSlowerSpeech: boolean;
+  audioLevel?: number;
   textInput: string;
   onToggleMic: () => void;
   onRepeatLastReply: () => void;
@@ -19,6 +21,7 @@ export const VoiceControls: React.FC<VoiceControlsProps> = ({
   orbState,
   isListening,
   isSlowerSpeech,
+  audioLevel = 0,
   textInput,
   onToggleMic,
   onRepeatLastReply,
@@ -28,22 +31,16 @@ export const VoiceControls: React.FC<VoiceControlsProps> = ({
 }) => {
   const [showTextInput, setShowTextInput] = useState(false);
 
-  // Status words from REAL events only
   const getStatusText = (): string => {
     switch (orbState) {
-      case 'listening':
-        return 'Listening';
-      case 'transcribing':
-        return 'Listening';
-      case 'thinking':
-        return 'Thinking';
-      case 'speaking':
-        return 'Speaking';
-      case 'offline_error':
-        return 'Tutor unavailable';
+      case 'listening': return 'Listening...';
+      case 'transcribing': return 'Processing...';
+      case 'thinking': return 'Thinking...';
+      case 'speaking': return 'Speaking...';
+      case 'offline_error': return 'Coach unavailable';
       case 'idle':
       default:
-        return 'Tap to talk';
+        return 'Tap to Speak';
     }
   };
 
@@ -51,37 +48,36 @@ export const VoiceControls: React.FC<VoiceControlsProps> = ({
 
   return (
     <div 
-      className="p-4 border-t border-[var(--border)] bg-[var(--surface)] backdrop-blur-md transition-colors"
+      className="p-3.5 border-t border-[var(--border)] bg-[var(--surface)]/95 backdrop-blur-md"
       role="region"
       aria-label="Voice conversation controls"
     >
-      <div className="max-w-[720px] mx-auto flex flex-col gap-3">
+      <div className="max-w-[720px] mx-auto flex flex-col gap-2.5">
         {showTextInput ? (
-          /* Type Instead Mode */
           <div className="flex items-center gap-2">
             <button
               onClick={() => setShowTextInput(false)}
-              className="min-h-[44px] min-w-[44px] px-3 rounded-[12px] bg-[var(--surface-2)] text-[var(--text)] border border-[var(--border)] hover:bg-[var(--surface)] transition-colors inline-flex items-center justify-center text-[14px] font-semibold cursor-pointer shrink-0"
+              className="h-11 px-3 rounded-xl bg-[var(--surface-2)] text-[var(--text)] border border-[var(--border)] hover:border-cyan-400 transition-colors inline-flex items-center justify-center shrink-0 cursor-pointer"
               title="Switch back to voice"
               aria-label="Switch back to microphone"
             >
-              <Mic className="w-5 h-5 text-[var(--accent)]" />
+              <Mic className="w-4 h-4 text-cyan-400" />
             </button>
             <input
               type="text"
               value={textInput}
               onChange={(e) => onTextInputChange(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && onSendTextMessage()}
-              placeholder="Type your message to the tutor..."
-              aria-label="Message to tutor"
-              className="flex-1 min-h-[44px] px-4 py-2.5 rounded-[12px] bg-[var(--surface-2)] text-[var(--text)] border border-[var(--border)] focus:border-[var(--accent)] text-[16px] outline-none transition-colors"
+              placeholder="Ask coach or practice phrase..."
+              aria-label="Message to coach"
+              className="flex-1 h-11 px-4 rounded-xl bg-[var(--surface-2)] text-[var(--text)] border border-[var(--border)] focus:border-indigo-500 text-sm outline-none transition-colors"
               autoFocus
             />
             <Button
               variant="primary"
               onClick={onSendTextMessage}
               disabled={!textInput.trim()}
-              className="shrink-0"
+              className="h-11 shrink-0 bg-gradient-to-r from-indigo-600 to-cyan-600 border-none shadow-md"
               aria-label="Send message"
             >
               <Send className="w-4 h-4 mr-1.5" />
@@ -89,59 +85,62 @@ export const VoiceControls: React.FC<VoiceControlsProps> = ({
             </Button>
           </div>
         ) : (
-          /* One Big Mic Button with Secondary Small Buttons */
-          <div className="flex items-center justify-between gap-3">
-            {/* Small Repeat button */}
+          <div className="flex items-center justify-between gap-2.5">
+            {/* Repeat coach audio */}
             <button
               onClick={onRepeatLastReply}
-              className="min-h-[44px] min-w-[44px] px-3.5 py-2 rounded-[12px] bg-[var(--surface-2)] text-[var(--text)] border border-[var(--border)] hover:bg-[var(--surface)] transition-colors inline-flex items-center justify-center gap-1.5 text-[14px] font-medium cursor-pointer"
-              title="Repeat tutor's last response"
-              aria-label="Repeat tutor's last response"
+              className="h-11 px-3.5 rounded-xl bg-[var(--surface-2)] text-[var(--text)] border border-[var(--border)] hover:border-indigo-400/50 transition-all inline-flex items-center justify-center gap-1.5 text-xs font-semibold cursor-pointer shadow-sm active:scale-95"
+              title="Replay coach audio"
+              aria-label="Replay coach audio"
             >
               <RotateCcw className="w-4 h-4 text-[var(--muted)]" />
-              <span className="hidden sm:inline">Repeat</span>
+              <span className="hidden sm:inline">Replay</span>
             </button>
 
-            {/* ONE Big Mic Button */}
+            {/* Glowing Center Microphone Button */}
             <button
               onClick={onToggleMic}
               aria-pressed={isListening}
               aria-label={`${statusWord} - click to toggle speech input`}
-              className={`flex-1 max-w-[280px] min-h-[52px] px-6 py-3 rounded-full font-bold text-[16px] inline-flex items-center justify-center gap-3 transition-all duration-150 cursor-pointer select-none shadow-[var(--shadow-sm)] active:scale-[0.98] ${
+              className={`flex-1 max-w-[280px] h-12 px-6 rounded-full font-bold text-sm inline-flex items-center justify-center gap-2.5 transition-all duration-200 cursor-pointer select-none shadow-lg active:scale-95 ${
                 isListening
-                  ? 'bg-[var(--danger)] text-white animate-pulse'
-                  : 'bg-[var(--accent)] text-[var(--accent-contrast)] hover:opacity-95'
+                  ? 'bg-gradient-to-r from-rose-500 to-red-600 text-white shadow-rose-500/30 animate-pulse'
+                  : 'bg-gradient-to-r from-indigo-600 via-blue-600 to-cyan-500 text-white hover:shadow-cyan-500/25 shadow-indigo-600/25'
               }`}
             >
               {isListening ? (
-                <MicOff className="w-5 h-5 text-white" />
+                <>
+                  <MicOff className="w-4 h-4 text-white" />
+                  <AudioWaveVisualizer isActive={true} audioLevel={audioLevel} barCount={4} colorScheme="cyan" />
+                </>
               ) : (
-                <Mic className="w-5 h-5" />
+                <>
+                  <Mic className="w-4 h-4 text-white" />
+                  <span>{statusWord}</span>
+                </>
               )}
-              <span>{statusWord}</span>
             </button>
 
-            {/* Slower & Type Instead controls */}
+            {/* Slower & Type toggles */}
             <div className="flex items-center gap-2">
               <button
                 onClick={onToggleSlowerSpeech}
-                className={`min-h-[44px] min-w-[44px] px-3.5 py-2 rounded-[12px] border transition-colors inline-flex items-center justify-center gap-1.5 text-[14px] font-medium cursor-pointer ${
+                className={`h-11 px-3 rounded-xl border text-xs font-semibold transition-all inline-flex items-center justify-center gap-1.5 cursor-pointer shadow-sm active:scale-95 ${
                   isSlowerSpeech
-                    ? 'bg-[var(--accent)]/15 border-[var(--accent)] text-[var(--accent)]'
-                    : 'bg-[var(--surface-2)] border-[var(--border)] text-[var(--text)] hover:bg-[var(--surface)]'
+                    ? 'bg-amber-500/15 border-amber-400 text-amber-300'
+                    : 'bg-[var(--surface-2)] border-[var(--border)] text-[var(--text)] hover:border-indigo-400/50'
                 }`}
-                title={isSlowerSpeech ? 'Slower speech enabled' : 'Toggle slower speech'}
+                title={isSlowerSpeech ? '0.8x Slow Pacing active' : 'Switch to 0.8x slow pacing'}
                 aria-pressed={isSlowerSpeech}
-                aria-label="Toggle slower speech rate"
               >
                 <Gauge className="w-4 h-4 text-[var(--muted)]" />
-                <span className="hidden sm:inline">Slower</span>
+                <span className="hidden sm:inline">{isSlowerSpeech ? '0.8x' : '1.0x'}</span>
               </button>
 
               <button
                 onClick={() => setShowTextInput(true)}
-                className="min-h-[44px] min-w-[44px] px-3 py-2 rounded-[12px] bg-[var(--surface-2)] text-[var(--text)] border border-[var(--border)] hover:bg-[var(--surface)] transition-colors inline-flex items-center justify-center gap-1.5 text-[14px] font-medium cursor-pointer"
-                title="Type message instead of speaking"
+                className="h-11 px-3 rounded-xl bg-[var(--surface-2)] text-[var(--text)] border border-[var(--border)] hover:border-indigo-400/50 transition-all inline-flex items-center justify-center gap-1.5 text-xs font-semibold cursor-pointer shadow-sm active:scale-95"
+                title="Type instead of speaking"
                 aria-label="Type instead"
               >
                 <MessageSquare className="w-4 h-4 text-[var(--muted)]" />

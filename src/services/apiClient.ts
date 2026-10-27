@@ -80,13 +80,41 @@ export interface DbStatusInfo {
 }
 
 let storedCsrfToken: string | null = null;
+let storedSessionId: string | null = null;
+
+if (typeof window !== 'undefined') {
+  try {
+    storedSessionId = localStorage.getItem('luma_session_id');
+    storedCsrfToken = localStorage.getItem('luma_csrf_token');
+  } catch {}
+}
 
 export function setCsrfToken(token: string | null) {
   storedCsrfToken = token;
+  if (typeof window !== 'undefined') {
+    try {
+      if (token) localStorage.setItem('luma_csrf_token', token);
+      else localStorage.removeItem('luma_csrf_token');
+    } catch {}
+  }
 }
 
 export function getCsrfToken(): string | null {
   return storedCsrfToken;
+}
+
+export function setSessionId(id: string | null) {
+  storedSessionId = id;
+  if (typeof window !== 'undefined') {
+    try {
+      if (id) localStorage.setItem('luma_session_id', id);
+      else localStorage.removeItem('luma_session_id');
+    } catch {}
+  }
+}
+
+export function getSessionId(): string | null {
+  return storedSessionId;
 }
 
 function normalizeUser(user: any): UserProfile {
@@ -110,14 +138,87 @@ function normalizeUser(user: any): UserProfile {
   };
 }
 
+let authCheckPromise: Promise<string | null> | null = null;
+
+async function ensureCsrfToken(): Promise<string | null> {
+  if (storedCsrfToken && storedSessionId) return storedCsrfToken;
+  if (!authCheckPromise) {
+    const headers: Record<string, string> = {};
+    if (storedSessionId) {
+      headers['X-Session-ID'] = storedSessionId;
+      headers['Authorization'] = `Bearer ${storedSessionId}`;
+    }
+    authCheckPromise = fetch('/api/auth/me', { headers, credentials: 'include' })
+      .then(res => (res.ok ? safeParseJson(res) : null))
+      .then(data => {
+        if (data?.csrfToken) setCsrfToken(data.csrfToken);
+        if (data?.sessionId) setSessionId(data.sessionId);
+        return data?.csrfToken || null;
+      })
+      .catch(() => null)
+      .finally(() => {
+        authCheckPromise = null;
+      });
+  }
+  return authCheckPromise;
+}
+
+export async function safeParseJson<T = any>(res: Response): Promise<T> {
+  const contentType = res.headers.get('content-type') || '';
+  if (contentType.includes('application/json')) {
+    try {
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || data.message || `Request failed with status ${res.status}`);
+      }
+      return data as T;
+    } catch (e: any) {
+      if (!res.ok) {
+        throw new Error(e?.message || `Request failed with status ${res.status}`);
+      }
+      throw e;
+    }
+  }
+
+  // Fallback for non-JSON response body (e.g. proxy notices or html error pages)
+  const text = await res.text();
+  if (!res.ok) {
+    if (res.status === 403) {
+      throw new Error('Your session or security token expired. Please refresh the page.');
+    }
+    if (res.status === 502 || res.status === 503 || res.status === 504) {
+      throw new Error('AI service is temporarily warming up. Please try again in a moment.');
+    }
+    throw new Error(`Service notice (${res.status}): ${text.slice(0, 100)}`);
+  }
+
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    throw new Error('Unexpected response format from server.');
+  }
+}
+
 async function request(url: string, options: RequestInit = {}): Promise<Response> {
   const headers: Record<string, string> = {
     ...(options.headers as Record<string, string> || {})
   };
 
+  if (storedSessionId) {
+    headers['X-Session-ID'] = storedSessionId;
+    if (!headers['Authorization']) {
+      headers['Authorization'] = `Bearer ${storedSessionId}`;
+    }
+  }
+
   const method = (options.method || 'GET').toUpperCase();
-  if (['POST', 'PUT', 'DELETE', 'PATCH'].includes(method) && storedCsrfToken) {
-    headers['X-CSRF-Token'] = storedCsrfToken;
+  if (['POST', 'PUT', 'DELETE', 'PATCH'].includes(method)) {
+    if (!storedCsrfToken && !url.includes('/api/auth/')) {
+      await ensureCsrfToken();
+    }
+    if (storedCsrfToken) {
+      headers['X-CSRF-Token'] = storedCsrfToken;
+    }
   }
 
   const response = await fetch(url, {
@@ -125,6 +226,11 @@ async function request(url: string, options: RequestInit = {}): Promise<Response
     headers,
     credentials: 'include'
   });
+
+  const respSessionId = response.headers.get('X-Session-ID');
+  if (respSessionId) setSessionId(respSessionId);
+  const respCsrf = response.headers.get('X-CSRF-Token');
+  if (respCsrf) setCsrfToken(respCsrf);
 
   return response;
 }
@@ -135,7 +241,7 @@ export const apiClient = {
     try {
       const res = await request('/api/health');
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      return await res.json();
+      return await safeParseJson(res);
     } catch {
       return {
         status: 'offline',
@@ -150,16 +256,18 @@ export const apiClient = {
   },
 
   // Auth Operations
-  async checkAuth(): Promise<{ authenticated: boolean; user?: UserProfile; csrfToken?: string }> {
+  async checkAuth(): Promise<{ authenticated: boolean; user?: UserProfile; csrfToken?: string; sessionId?: string }> {
     try {
       const res = await request('/api/auth/me');
       if (res.ok) {
-        const data = await res.json();
-        if (data.csrfToken) setCsrfToken(data.csrfToken);
+        const data = await safeParseJson(res);
+        if (data?.csrfToken) setCsrfToken(data.csrfToken);
+        if (data?.sessionId) setSessionId(data.sessionId);
         return {
           authenticated: true,
-          user: normalizeUser(data.user),
-          csrfToken: data.csrfToken
+          user: normalizeUser(data?.user),
+          csrfToken: data?.csrfToken,
+          sessionId: data?.sessionId
         };
       }
       return { authenticated: false };
@@ -174,9 +282,9 @@ export const apiClient = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data)
     });
-    const result = await res.json();
-    if (!res.ok) throw new Error(result.error || 'Registration failed');
+    const result = await safeParseJson(res);
     if (result.csrfToken) setCsrfToken(result.csrfToken);
+    if (result.sessionId) setSessionId(result.sessionId);
     return { ...result, user: normalizeUser(result.user) };
   },
 
@@ -186,15 +294,16 @@ export const apiClient = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(credentials)
     });
-    const result = await res.json();
-    if (!res.ok) throw new Error(result.error || 'Login failed');
+    const result = await safeParseJson(res);
     if (result.csrfToken) setCsrfToken(result.csrfToken);
+    if (result.sessionId) setSessionId(result.sessionId);
     return { ...result, user: normalizeUser(result.user) };
   },
 
   async logout() {
     await request('/api/auth/logout', { method: 'POST' });
     setCsrfToken(null);
+    setSessionId(null);
   },
 
   async forgotPassword(email: string) {
@@ -203,7 +312,7 @@ export const apiClient = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email })
     });
-    return await res.json();
+    return await safeParseJson(res);
   },
 
   async resetPassword(token: string, newPassword: string) {
@@ -212,8 +321,7 @@ export const apiClient = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ token, newPassword })
     });
-    const result = await res.json();
-    if (!res.ok) throw new Error(result.error || 'Password reset failed');
+    const result = await safeParseJson(res);
     return result;
   },
 
@@ -221,7 +329,7 @@ export const apiClient = {
   async getProfile(): Promise<UserProfile> {
     const res = await request('/api/auth/profile');
     if (!res.ok) throw new Error('Failed to load profile');
-    const user = await res.json();
+    const user = await safeParseJson(res);
     return normalizeUser(user);
   },
 
@@ -240,7 +348,7 @@ export const apiClient = {
       body: JSON.stringify(normalizedPayload)
     });
     if (!res.ok) throw new Error('Failed to update profile');
-    const user = await res.json();
+    const user = await safeParseJson(res);
     return normalizeUser(user);
   },
 
@@ -248,12 +356,12 @@ export const apiClient = {
   async getCurriculum(targetLanguage?: string): Promise<CurriculumModule[]> {
     const res = await request('/api/curriculum/lessons');
     if (res.ok) {
-      const data = await res.json();
+      const data = await safeParseJson(res);
       if (data?.modules) return data.modules;
     }
     const persRes = await request('/api/curriculum/personalized');
     if (persRes.ok) {
-      const p = await persRes.json();
+      const p = await safeParseJson(persRes);
       if (p?.modules) return p.modules;
     }
     return [];
@@ -267,7 +375,7 @@ export const apiClient = {
   async getProgress(): Promise<Record<string, any>> {
     const res = await request('/api/progress');
     if (!res.ok) return {};
-    return await res.json();
+    return await safeParseJson(res);
   },
 
   async saveProgress(lessonId: string, completed: boolean, score: number, timeSpent: number) {
@@ -276,14 +384,14 @@ export const apiClient = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ lessonId, completed, score, timeSpent })
     });
-    return await res.json();
+    return await safeParseJson(res);
   },
 
   // Vocabulary
   async getVocabulary(): Promise<VocabularyItem[]> {
     const res = await request('/api/vocabulary');
     if (!res.ok) return [];
-    return await res.json();
+    return await safeParseJson(res);
   },
 
   async saveVocabulary(item: Partial<VocabularyItem>): Promise<VocabularyItem> {
@@ -292,21 +400,21 @@ export const apiClient = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(item)
     });
-    return await res.json();
+    return await safeParseJson(res);
   },
 
   // Curriculum Lessons Endpoint
   async getCurriculumLessons(): Promise<{ version: string; reviewStatus: string; lessons: any[] }> {
     const res = await request('/api/curriculum/lessons');
     if (!res.ok) throw new Error('Failed to load lessons');
-    return await res.json();
+    return await safeParseJson(res);
   },
 
   // Assessments
   async getAssessments(): Promise<AssessmentAttempt[]> {
     const res = await request('/api/assessments');
     if (!res.ok) return [];
-    return await res.json();
+    return await safeParseJson(res);
   },
 
   async submitAssessment(payload: {
@@ -324,14 +432,21 @@ export const apiClient = {
     grammar_score?: number;
     lexical_score?: number;
   }): Promise<{ success: boolean; assessment: AssessmentAttempt }> {
+    const topicTitle = payload.topic_title || payload.topic || 'Spoken Practice Assessment';
+    const transcribedText = payload.transcribed_text || payload.learner_speech || '';
+    const voiceDuration = payload.user_voice_duration ?? payload.duration_seconds;
+
     const res = await request('/api/assessments', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
+      body: JSON.stringify({
+        ...payload,
+        topic_title: topicTitle,
+        transcribed_text: transcribedText,
+        user_voice_duration: voiceDuration
+      })
     });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Assessment submission failed');
-    return data;
+    return await safeParseJson(res);
   },
 
   // Conversational AI
@@ -358,11 +473,7 @@ export const apiClient = {
         }
       })
     });
-    const result = await res.json();
-    if (!res.ok) {
-      throw new Error(result.error || 'Tutor unavailable, try again');
-    }
-    return result;
+    return await safeParseJson(res);
   },
 
   async sendChatMessage(payload: {
@@ -373,17 +484,14 @@ export const apiClient = {
     proficiencyLevel?: string;
     scenarioContext?: string;
     curriculumContext?: any;
+    lessonContext?: any;
   }) {
     const res = await request('/api/ai/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     });
-    const result = await res.json();
-    if (!res.ok) {
-      throw new Error(result.error || 'Tutor unavailable, try again');
-    }
-    return result;
+    return await safeParseJson(res);
   },
 
   // Text to Speech
@@ -412,7 +520,7 @@ export const apiClient = {
   async getPrivacyConsents() {
     const res = await request('/api/privacy/consents');
     if (!res.ok) return { store_transcripts: true, store_audio_samples: false, analytics_enabled: false };
-    return await res.json();
+    return await safeParseJson(res);
   },
 
   async updatePrivacyConsents(consents: any) {
@@ -421,7 +529,7 @@ export const apiClient = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(consents)
     });
-    return await res.json();
+    return await safeParseJson(res);
   },
 
   async exportUserData() {
@@ -440,7 +548,7 @@ export const apiClient = {
 
   async purgeAccount() {
     const res = await request('/api/privacy/purge', { method: 'POST' });
-    const result = await res.json();
+    const result = await safeParseJson(res);
     if (!res.ok) throw new Error(result.error || 'Purge failed');
     setCsrfToken(null);
     return result;
@@ -454,7 +562,7 @@ export const apiClient = {
   async getOnboarding() {
     const res = await request('/api/onboarding');
     if (!res.ok) return null;
-    return await res.json();
+    return await safeParseJson(res);
   },
 
   async saveOnboarding(answers: any) {
@@ -463,7 +571,7 @@ export const apiClient = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(answers)
     });
-    return await res.json();
+    return await safeParseJson(res);
   },
 
   async generateCurriculum(answers: any) {
@@ -472,13 +580,13 @@ export const apiClient = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(answers)
     });
-    return await res.json();
+    return await safeParseJson(res);
   },
 
   async getPersonalizedCurriculum() {
     const res = await request('/api/curriculum/personalized');
     if (!res.ok) return null;
-    return await res.json();
+    return await safeParseJson(res);
   },
 
   // Missions
@@ -488,13 +596,13 @@ export const apiClient = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data)
     });
-    return await res.json();
+    return await safeParseJson(res);
   },
 
   async getMissionSummary() {
     const res = await request('/api/missions/summary');
     if (!res.ok) return null;
-    return await res.json();
+    return await safeParseJson(res);
   },
 
   async getMissionsSummary() {

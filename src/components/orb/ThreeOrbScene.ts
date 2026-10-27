@@ -1,14 +1,10 @@
 import * as THREE from 'three';
 import { VoiceSessionState } from './types.ts';
 import {
-  glassVertexShader,
-  glassFragmentShader,
-  haloVertexShader,
-  haloFragmentShader,
-  coreVertexShader,
-  coreFragmentShader,
-  tendrilVertexShader,
-  tendrilFragmentShader
+  chatgptOrbVertexShader,
+  chatgptOrbFragmentShader,
+  chatgptGlowVertexShader,
+  chatgptGlowFragmentShader
 } from './shaders.ts';
 
 export class ThreeOrbScene {
@@ -20,30 +16,28 @@ export class ThreeOrbScene {
   private clock = new THREE.Clock();
 
   // Mesh & Materials
-  private glassMesh: THREE.Mesh;
-  private glassMat: THREE.ShaderMaterial;
-  private haloMesh: THREE.Mesh;
-  private haloMat: THREE.ShaderMaterial;
-  private coreMesh: THREE.Mesh;
-  private coreMat: THREE.ShaderMaterial;
-  private tendrilsMesh: THREE.Points;
-  private tendrilsMat: THREE.ShaderMaterial;
+  private orbMesh: THREE.Mesh;
+  private orbMat: THREE.ShaderMaterial;
+  private glowMesh: THREE.Mesh;
+  private glowMat: THREE.ShaderMaterial;
 
   private state: VoiceSessionState = 'idle';
-  private audioLevel = 0;
+  private targetAudioLevel = 0;
+  private currentAudioLevel = 0;
   private reducedMotion = false;
 
+  // ChatGPT State Animation Settings
   private stateParams = {
-    speed: 1.0,
-    orbitSpeed: 0.8,
-    tendrilAmplitude: 1.0,
-    nebulaIntensity: 1.0,
-    tendrilBrightness: 1.0,
-    rimColor: new THREE.Color('#6C7BFF'),
-    targetRimColor: new THREE.Color('#6C7BFF'),
-    cyanWeight: 1.0,
-    magentaWeight: 1.0,
-    amberWeight: 1.0
+    speed: 0.9,
+    distortion: 0.45,
+    frequency: 1.2,
+    intensity: 1.05,
+    targetCyan: new THREE.Color('#38bdf8'),
+    targetBlue: new THREE.Color('#2563eb'),
+    targetViolet: new THREE.Color('#a855f7'),
+    targetCore: new THREE.Color('#ffffff'),
+    targetGlow: new THREE.Color('#38bdf8'),
+    rotationSpeed: 0.4
   };
 
   constructor(mount: HTMLElement, reducedMotion = false) {
@@ -55,9 +49,8 @@ export class ThreeOrbScene {
 
     this.scene = new THREE.Scene();
     this.camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 100);
-    this.camera.position.z = 3.2;
+    this.camera.position.z = 2.8;
 
-    // Transparent canvas to match background tokens without dark patches
     this.renderer = new THREE.WebGLRenderer({
       alpha: true,
       antialias: true,
@@ -69,142 +62,121 @@ export class ThreeOrbScene {
 
     this.mount.appendChild(this.renderer.domElement);
 
-    // 1. Core Nebula Sphere
-    const coreGeo = new THREE.SphereGeometry(0.72, 32, 32);
-    this.coreMat = new THREE.ShaderMaterial({
-      vertexShader: coreVertexShader,
-      fragmentShader: coreFragmentShader,
+    // 1. Organic Fluid Orb Mesh
+    const orbGeo = new THREE.IcosahedronGeometry(0.88, 48);
+    this.orbMat = new THREE.ShaderMaterial({
+      vertexShader: chatgptOrbVertexShader,
+      fragmentShader: chatgptOrbFragmentShader,
       uniforms: {
         uTime: { value: 0 },
-        uAudioReact: { value: 0 },
-        uIntensity: { value: 1.0 }
+        uAudio: { value: 0 },
+        uDistortion: { value: 0.45 },
+        uFrequency: { value: 1.2 },
+        uIntensity: { value: 1.05 },
+        uColorCyan: { value: new THREE.Color('#38bdf8') },
+        uColorBlue: { value: new THREE.Color('#2563eb') },
+        uColorViolet: { value: new THREE.Color('#a855f7') },
+        uColorCore: { value: new THREE.Color('#ffffff') }
       },
       transparent: true,
-      blending: THREE.AdditiveBlending,
       depthWrite: false
     });
-    this.coreMesh = new THREE.Mesh(coreGeo, this.coreMat);
-    this.scene.add(this.coreMesh);
+    this.orbMesh = new THREE.Mesh(orbGeo, this.orbMat);
+    this.scene.add(this.orbMesh);
 
-    // 2. Tendrils / Ribbons Particles (lower particle count on mobile screens)
-    const particleCount = width < 480 ? 400 : 1000;
-    const posArray = new Float32Array(particleCount * 3);
-    const radiusArray = new Float32Array(particleCount);
-    for (let i = 0; i < particleCount; i++) {
-      const theta = Math.random() * Math.PI * 2;
-      const phi = Math.acos(Math.random() * 2 - 1);
-      const r = 0.5 + Math.random() * 0.45;
-      posArray[i * 3] = r * Math.sin(phi) * Math.cos(theta);
-      posArray[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta);
-      posArray[i * 3 + 2] = r * Math.cos(phi);
-      radiusArray[i] = r;
-    }
-    const tendrilGeo = new THREE.BufferGeometry();
-    tendrilGeo.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
-    tendrilGeo.setAttribute('aRadius', new THREE.BufferAttribute(radiusArray, 1));
-
-    this.tendrilsMat = new THREE.ShaderMaterial({
-      vertexShader: tendrilVertexShader,
-      fragmentShader: tendrilFragmentShader,
+    // 2. Ambient Volumetric Glow Halo
+    const glowGeo = new THREE.SphereGeometry(1.08, 32, 32);
+    this.glowMat = new THREE.ShaderMaterial({
+      vertexShader: chatgptGlowVertexShader,
+      fragmentShader: chatgptGlowFragmentShader,
       uniforms: {
-        uTime: { value: 0 },
-        uAmplitude: { value: 1.0 },
-        uBrightness: { value: 1.0 }
-      },
-      transparent: true,
-      blending: THREE.AdditiveBlending,
-      depthWrite: false
-    });
-    this.tendrilsMesh = new THREE.Points(tendrilGeo, this.tendrilsMat);
-    this.scene.add(this.tendrilsMesh);
-
-    // 3. Halo
-    const haloGeo = new THREE.SphereGeometry(0.96, 32, 32);
-    this.haloMat = new THREE.ShaderMaterial({
-      vertexShader: haloVertexShader,
-      fragmentShader: haloFragmentShader,
-      uniforms: {
-        uTime: { value: 0 },
-        uHaloColor: { value: this.stateParams.rimColor }
+        uGlowColor: { value: new THREE.Color('#38bdf8') },
+        uAudio: { value: 0 },
+        uPulse: { value: 0 }
       },
       transparent: true,
       blending: THREE.AdditiveBlending,
       depthWrite: false,
       side: THREE.BackSide
     });
-    this.haloMesh = new THREE.Mesh(haloGeo, this.haloMat);
-    this.scene.add(this.haloMesh);
-
-    // 4. Glass Shell
-    const glassGeo = new THREE.SphereGeometry(1.0, 48, 48);
-    this.glassMat = new THREE.ShaderMaterial({
-      vertexShader: glassVertexShader,
-      fragmentShader: glassFragmentShader,
-      uniforms: {
-        uTime: { value: 0 },
-        uRimColor: { value: this.stateParams.rimColor }
-      },
-      transparent: true,
-      depthWrite: false
-    });
-    this.glassMesh = new THREE.Mesh(glassGeo, this.glassMat);
-    this.scene.add(this.glassMesh);
+    this.glowMesh = new THREE.Mesh(glowGeo, this.glowMat);
+    this.scene.add(this.glowMesh);
 
     this.startLoop();
   }
 
   public updateState(state: VoiceSessionState, audioLevel = 0) {
     this.state = state;
-    this.audioLevel = audioLevel;
+    this.targetAudioLevel = Math.max(0, Math.min(1, audioLevel));
     const p = this.stateParams;
 
     switch (state) {
       case 'listening':
-        p.speed = 1.6;
-        p.orbitSpeed = 1.4;
-        p.tendrilAmplitude = 1.3;
-        p.nebulaIntensity = 1.3;
-        p.tendrilBrightness = 1.4;
-        p.targetRimColor.set('#06B6D4'); // cyan
+        p.speed = 1.4;
+        p.distortion = 0.65;
+        p.frequency = 1.5;
+        p.intensity = 1.2;
+        p.rotationSpeed = 0.6;
+        p.targetCyan.set('#22d3ee');
+        p.targetBlue.set('#0284c7');
+        p.targetViolet.set('#818cf8');
+        p.targetGlow.set('#22d3ee');
         break;
       case 'transcribing':
-        p.speed = 1.8;
-        p.orbitSpeed = 1.5;
-        p.tendrilAmplitude = 1.2;
-        p.nebulaIntensity = 1.2;
-        p.targetRimColor.set('#38BDF8');
+        p.speed = 1.6;
+        p.distortion = 0.75;
+        p.frequency = 1.6;
+        p.intensity = 1.15;
+        p.rotationSpeed = 0.9;
+        p.targetCyan.set('#38bdf8');
+        p.targetBlue.set('#3b82f6');
+        p.targetViolet.set('#a855f7');
+        p.targetGlow.set('#38bdf8');
         break;
       case 'thinking':
         p.speed = 2.2;
-        p.orbitSpeed = 2.0;
-        p.tendrilAmplitude = 1.1;
-        p.nebulaIntensity = 1.4;
-        p.tendrilBrightness = 1.2;
-        p.targetRimColor.set('#8B5CF6'); // violet
+        p.distortion = 0.85;
+        p.frequency = 2.0;
+        p.intensity = 1.3;
+        p.rotationSpeed = 1.8;
+        p.targetCyan.set('#818cf8');
+        p.targetBlue.set('#6366f1');
+        p.targetViolet.set('#c084fc');
+        p.targetGlow.set('#a855f7');
         break;
       case 'speaking':
-        p.speed = 1.7;
-        p.orbitSpeed = 1.3;
-        p.tendrilAmplitude = 1.3;
-        p.nebulaIntensity = 1.35;
-        p.tendrilBrightness = 1.3;
-        p.targetRimColor.set('#EC4899'); // pink
+        p.speed = 1.8;
+        p.distortion = 0.9;
+        p.frequency = 1.8;
+        p.intensity = 1.35;
+        p.rotationSpeed = 0.8;
+        p.targetCyan.set('#38bdf8');
+        p.targetBlue.set('#2563eb');
+        p.targetViolet.set('#a855f7');
+        p.targetGlow.set('#38bdf8');
         break;
       case 'offline_error':
-        p.speed = 0.5;
-        p.orbitSpeed = 0.4;
-        p.tendrilAmplitude = 0.5;
-        p.nebulaIntensity = 0.7;
-        p.targetRimColor.set('#EF4444');
+        p.speed = 0.6;
+        p.distortion = 0.3;
+        p.frequency = 1.0;
+        p.intensity = 0.8;
+        p.rotationSpeed = 0.2;
+        p.targetCyan.set('#fb923c');
+        p.targetBlue.set('#ea580c');
+        p.targetViolet.set('#ef4444');
+        p.targetGlow.set('#f97316');
         break;
       case 'idle':
       default:
-        p.speed = 1.0;
-        p.orbitSpeed = 0.8;
-        p.tendrilAmplitude = 1.0;
-        p.nebulaIntensity = 1.0;
-        p.tendrilBrightness = 1.0;
-        p.targetRimColor.set('#6C7BFF');
+        p.speed = 0.9;
+        p.distortion = 0.45;
+        p.frequency = 1.2;
+        p.intensity = 1.05;
+        p.rotationSpeed = 0.35;
+        p.targetCyan.set('#38bdf8');
+        p.targetBlue.set('#2563eb');
+        p.targetViolet.set('#a855f7');
+        p.targetGlow.set('#38bdf8');
         break;
     }
   }
@@ -221,33 +193,40 @@ export class ThreeOrbScene {
     const animate = () => {
       this.animFrameId = requestAnimationFrame(animate);
 
-      const delta = this.clock.getDelta();
+      const delta = Math.min(this.clock.getDelta(), 0.1);
       const speed = this.reducedMotion ? 0.2 : this.stateParams.speed;
       t += delta * speed;
 
+      // Smooth audio damping
+      this.currentAudioLevel += (this.targetAudioLevel - this.currentAudioLevel) * 0.15;
+
       // Smooth color transitions
-      this.stateParams.rimColor.lerp(this.stateParams.targetRimColor, 0.08);
+      const u = this.orbMat.uniforms;
+      u.uColorCyan.value.lerp(this.stateParams.targetCyan, 0.08);
+      u.uColorBlue.value.lerp(this.stateParams.targetBlue, 0.08);
+      u.uColorViolet.value.lerp(this.stateParams.targetViolet, 0.08);
+      u.uColorCore.value.lerp(this.stateParams.targetCore, 0.08);
+      this.glowMat.uniforms.uGlowColor.value.lerp(this.stateParams.targetGlow, 0.08);
 
       // Uniform updates
-      this.coreMat.uniforms.uTime.value = t;
-      this.coreMat.uniforms.uAudioReact.value = this.audioLevel;
-      this.coreMat.uniforms.uIntensity.value = this.stateParams.nebulaIntensity;
+      u.uTime.value = t;
+      u.uAudio.value = this.currentAudioLevel;
+      u.uDistortion.value += (this.stateParams.distortion - u.uDistortion.value) * 0.08;
+      u.uFrequency.value += (this.stateParams.frequency - u.uFrequency.value) * 0.08;
+      u.uIntensity.value += (this.stateParams.intensity - u.uIntensity.value) * 0.08;
 
-      this.tendrilsMat.uniforms.uTime.value = t;
-      this.tendrilsMat.uniforms.uAmplitude.value = this.stateParams.tendrilAmplitude + this.audioLevel * 0.4;
-      this.tendrilsMat.uniforms.uBrightness.value = this.stateParams.tendrilBrightness;
+      this.glowMat.uniforms.uAudio.value = this.currentAudioLevel;
+      this.glowMat.uniforms.uPulse.value = Math.sin(t * 1.5) * 0.5 + 0.5;
 
-      this.haloMat.uniforms.uTime.value = t;
-      this.haloMat.uniforms.uHaloColor.value = this.stateParams.rimColor;
+      // Organic continuous 3D rotation
+      const rot = delta * (this.reducedMotion ? 0.05 : this.stateParams.rotationSpeed);
+      this.orbMesh.rotation.y += rot;
+      this.orbMesh.rotation.x += rot * 0.4;
+      this.glowMesh.rotation.y += rot * 0.5;
 
-      this.glassMat.uniforms.uTime.value = t;
-      this.glassMat.uniforms.uRimColor.value = this.stateParams.rimColor;
-
-      // Gentle rotation
-      const rotSpeed = delta * (this.reducedMotion ? 0.1 : this.stateParams.orbitSpeed * 0.4);
-      this.glassMesh.rotation.y += rotSpeed;
-      this.tendrilsMesh.rotation.y -= rotSpeed * 0.8;
-      this.coreMesh.rotation.y += rotSpeed * 0.5;
+      // Organic scaling with speech audio
+      const audioScale = 1.0 + this.currentAudioLevel * 0.15 + Math.sin(t * 1.2) * 0.02;
+      this.orbMesh.scale.set(audioScale, audioScale, audioScale);
 
       this.renderer.render(this.scene, this.camera);
     };
@@ -261,15 +240,10 @@ export class ThreeOrbScene {
       this.animFrameId = null;
     }
 
-    // Dispose geometries & materials
-    this.glassMesh?.geometry?.dispose();
-    this.glassMat?.dispose();
-    this.haloMesh?.geometry?.dispose();
-    this.haloMat?.dispose();
-    this.coreMesh?.geometry?.dispose();
-    this.coreMat?.dispose();
-    this.tendrilsMesh?.geometry?.dispose();
-    this.tendrilsMat?.dispose();
+    this.orbMesh?.geometry?.dispose();
+    this.orbMat?.dispose();
+    this.glowMesh?.geometry?.dispose();
+    this.glowMat?.dispose();
 
     if (this.renderer) {
       this.renderer.dispose();

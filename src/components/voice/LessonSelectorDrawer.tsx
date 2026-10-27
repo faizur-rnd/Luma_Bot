@@ -24,7 +24,7 @@ export const LessonSelectorDrawer: React.FC<LessonSelectorDrawerProps> = ({
       isOpen={isOpen}
       onClose={onClose}
       title="Practice Scenarios"
-      description="Choose a real-world scenario to practice with your tutor."
+      description="Choose a real-world scenario to practice with your coach."
       maxWidth="lg"
     >
       <div className="flex flex-col gap-5 py-2">
