@@ -110,7 +110,10 @@ export async function generatePersonalizedCurriculum(
 
   if (apiKey && !apiKey.includes('MY_GEMINI_API_KEY')) {
     try {
-      const ai = new GoogleGenAI({});
+      const ai = new GoogleGenAI({
+        apiKey,
+        httpOptions: { headers: { 'User-Agent': 'aistudio-build' } }
+      });
       const prompt = `
 You are LUMA's Master Multilingual Curriculum Architect.
 Generate an individual, scientifically grounded personalized curriculum for a learner learning ${targetLangCap.name} (${targetLangCap.nativeName}) with these 10 onboarding answers:
@@ -185,7 +188,7 @@ MANDATORY RULES:
 
       // Optimized rapid generation: single fast model with 4-second timeout to avoid long waits
       const fastAiPromise = ai.models.generateContent({
-        model: 'gemini-3.8-flash',
+        model: 'gemini-2.5-flash',
         contents: prompt,
         config: {
           responseMimeType: 'application/json'

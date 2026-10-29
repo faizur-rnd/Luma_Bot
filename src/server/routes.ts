@@ -48,12 +48,18 @@ const ResetPasswordSchema = z.object({
 
 const UpdateProfileSchema = z.object({
   displayName: z.string().min(1).max(100).optional(),
+  display_name: z.string().min(1).max(100).optional(),
   targetLanguage: z.string().max(10).optional(),
+  target_language: z.string().max(10).optional(),
   bridgeLanguage: z.string().max(10).optional(),
+  bridge_language: z.string().max(10).optional(),
   proficiencyLevel: z.string().max(20).optional(),
-  dailyGoalMinutes: z.number().int().min(5).max(180).optional(),
-  streakCount: z.number().int().min(0).optional()
-}).strict();
+  proficiency_level: z.string().max(20).optional(),
+  dailyGoalMinutes: z.coerce.number().int().min(5).max(180).optional(),
+  daily_goal_minutes: z.coerce.number().int().min(5).max(180).optional(),
+  streakCount: z.coerce.number().int().min(0).optional(),
+  streak_count: z.coerce.number().int().min(0).optional()
+});
 
 const RecordProgressSchema = z.object({
   lessonId: z.string().min(1).max(100),
@@ -624,7 +630,15 @@ router.get('/auth/profile', async (req, res) => {
 
 router.post('/auth/update', async (req, res) => {
   try {
-    const updates = UpdateProfileSchema.parse(req.body);
+    const parsed = UpdateProfileSchema.parse(req.body || {});
+    const updates = {
+      displayName: parsed.displayName ?? parsed.display_name,
+      targetLanguage: parsed.targetLanguage ?? parsed.target_language,
+      bridgeLanguage: parsed.bridgeLanguage ?? parsed.bridge_language,
+      proficiencyLevel: parsed.proficiencyLevel ?? parsed.proficiency_level,
+      dailyGoalMinutes: parsed.dailyGoalMinutes ?? parsed.daily_goal_minutes,
+      streakCount: parsed.streakCount ?? parsed.streak_count
+    };
     const updated = await db.updateUserProfile(req.user!.id, updates);
     res.json(updated);
   } catch (err: any) {

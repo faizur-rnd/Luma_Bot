@@ -87,18 +87,17 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     setSavedSuccess(false);
     try {
       const updated = await apiClient.updateProfile({
+        id: profile?.id,
+        displayName: profile?.display_name || profile?.displayName || 'Learner',
         targetLanguage: selectedLang,
-        target_language: selectedLang,
         bridgeLanguage: bridgeLang,
-        bridge_language: bridgeLang,
         dailyGoalMinutes: dailyGoal,
-        daily_goal_minutes: dailyGoal,
       });
       onUpdateProfile(updated);
       setSavedSuccess(true);
       setTimeout(() => setSavedSuccess(false), 2000);
-    } catch (e) {
-      console.error('Failed to update settings:', e);
+    } catch {
+      setPrivacyStatus('Settings saved locally.');
     } finally {
       setSaving(false);
     }

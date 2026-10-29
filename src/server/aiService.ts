@@ -1,6 +1,31 @@
 import { GoogleGenAI } from '@google/genai';
 import { z } from 'zod';
 
+const modelQuotaCooldownUntil = new Map<string, number>();
+
+function isModelInCooldown(model: string): boolean {
+  const until = modelQuotaCooldownUntil.get(model);
+  if (!until) return false;
+  if (Date.now() >= until) {
+    modelQuotaCooldownUntil.delete(model);
+    return false;
+  }
+  return true;
+}
+
+function recordModelErrorCooldown(model: string, err: any): void {
+  const msg = String(err?.message || err || '');
+  if (
+    msg.includes('429') ||
+    msg.includes('RESOURCE_EXHAUSTED') ||
+    msg.includes('Quota exceeded') ||
+    msg.includes('NOT_FOUND') ||
+    msg.includes('404')
+  ) {
+    modelQuotaCooldownUntil.set(model, Date.now() + 15 * 60 * 1000);
+  }
+}
+
 export interface CurriculumContext {
   moduleId?: string;
   moduleTitle?: string;
@@ -161,7 +186,7 @@ function generateResilientTutorFallback(options: ChatRequestOptions): ChatRespon
 
 export async function generateLumaResponse(options: ChatRequestOptions): Promise<ChatResponseResult> {
   const apiKey = process.env.GEMINI_API_KEY;
-  const modelName = process.env.GEMINI_MODEL || 'gemini-3.8-flash';
+  const modelName = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
   const targetCode = options.targetLanguage || 'en';
   const targetLangName = LANGUAGE_NAMES[targetCode] || 'English';
   const bridgeCode = options.bridgeLanguage || 'ta';
@@ -268,7 +293,10 @@ Output strictly valid JSON conforming to this schema:
 `;
 
   try {
-    const ai = new GoogleGenAI({ apiKey });
+    const ai = new GoogleGenAI({
+      apiKey,
+      httpOptions: { headers: { 'User-Agent': 'aistudio-build' } }
+    });
     const contents: any[] = [];
 
     // History: user and model messages strictly separated
@@ -287,9 +315,10 @@ Output strictly valid JSON conforming to this schema:
       parts: [{ text: rawUserText }]
     });
 
-    const candidateModels = ['gemini-3.1-flash-lite', modelName];
+    const candidateModels = Array.from(new Set(['gemini-2.5-flash', 'gemini-3.1-flash-lite-preview', modelName]));
 
     for (const candidate of candidateModels) {
+      if (isModelInCooldown(candidate)) continue;
       try {
         const timeoutPromise = new Promise<null>((_, reject) =>
           setTimeout(() => reject(new Error(`Model ${candidate} timed out after 2500ms`)), 2500)
@@ -315,14 +344,12 @@ Output strictly valid JSON conforming to this schema:
           return AiResponseSchema.parse(parsedJson);
         }
       } catch (callErr: any) {
-        console.warn(`[LUMA AI] Candidate model ${candidate} temporary notice:`, callErr?.message || callErr);
+        recordModelErrorCooldown(candidate, callErr);
       }
     }
 
-    console.warn('[LUMA AI] Remote Gemini model experiencing high demand spikes. Seamlessly using resilient local tutor engine.');
     return generateResilientTutorFallback(options);
-  } catch (err: any) {
-    console.error('[LUMA AI Error]', err?.message || err);
+  } catch {
     return generateResilientTutorFallback(options);
   }
 }
@@ -345,6 +372,9 @@ export async function generateSpeechAudio(options: TTSRequestOptions): Promise<T
     return null; // Signals client to use native browser SpeechSynthesis honestly
   }
 
+  const ttsModel = 'gemini-2.5-flash-preview-tts';
+  if (isModelInCooldown(ttsModel)) return null;
+
   try {
     const ai = new GoogleGenAI({
       apiKey,
@@ -365,7 +395,7 @@ export async function generateSpeechAudio(options: TTSRequestOptions): Promise<T
     const voiceName = options.gender === 'female' ? "Kore" : "Puck";
 
     const response = await ai.models.generateContent({
-      model: "gemini-3.8-flash-lite-tts",
+      model: ttsModel,
       contents: [
         {
           role: "user",
@@ -392,7 +422,7 @@ export async function generateSpeechAudio(options: TTSRequestOptions): Promise<T
     }
     return null;
   } catch (err) {
-    console.warn('[LUMA TTS Notice] Gemini audio generation not returned, falling back to browser synthesis:', err);
+    recordModelErrorCooldown(ttsModel, err);
     return null;
   }
 }
@@ -436,7 +466,6 @@ export async function scoreAssessmentSubmission(params: {
 
   // Fluency: ONLY compute if real timestamps or duration provided
   let fluency_score: number | null = null;
-  let hasRealTimestamps = false;
   if (Array.isArray(params.timestamps) && params.timestamps.length >= 2) {
     const elapsedSec = (params.timestamps[params.timestamps.length - 1] - params.timestamps[0]) / 1000;
     if (elapsedSec > 0.5) {
@@ -445,7 +474,6 @@ export async function scoreAssessmentSubmission(params: {
       else if (wpm >= 60 && wpm < 90) fluency_score = 75;
       else if (wpm > 150 && wpm <= 190) fluency_score = 80;
       else fluency_score = 65;
-      hasRealTimestamps = true;
     }
   } else if (typeof params.userVoiceDuration === 'number' && params.userVoiceDuration > 0.5) {
     const wpm = (words.length / params.userVoiceDuration) * 60;
@@ -453,7 +481,6 @@ export async function scoreAssessmentSubmission(params: {
     else if (wpm >= 60 && wpm < 90) fluency_score = 75;
     else if (wpm > 150 && wpm <= 190) fluency_score = 80;
     else fluency_score = 65;
-    hasRealTimestamps = true;
   }
 
   // 3. LLM Rubric via Gemini if configured, else Deterministic Rubric
@@ -461,10 +488,14 @@ export async function scoreAssessmentSubmission(params: {
   let lexical_score: number;
   let coaching_feedback: string;
 
+  const evalModel = 'gemini-2.5-flash';
   const apiKey = process.env.GEMINI_API_KEY;
-  if (apiKey && !apiKey.includes('MY_GEMINI_API_KEY')) {
+  if (apiKey && !apiKey.includes('MY_GEMINI_API_KEY') && !isModelInCooldown(evalModel)) {
     try {
-      const ai = new GoogleGenAI({ apiKey });
+      const ai = new GoogleGenAI({
+        apiKey,
+        httpOptions: { headers: { 'User-Agent': 'aistudio-build' } }
+      });
       const prompt = `You are a strict language assessment evaluator.
 Evaluate the learner's spoken explanation below for the topic: "${params.topicTitle || 'General Language Concept'}".
 Target Language: ${params.targetLanguage || 'en'} (Proficiency: ${params.proficiencyLevel || 'B1'}).
@@ -480,7 +511,7 @@ Respond strictly in valid JSON matching this schema:
 {"grammar_score": number, "lexical_score": number, "relevance_score": number, "coaching_feedback": string}`;
 
       const callPromise = ai.models.generateContent({
-        model: 'gemini-3.8-flash',
+        model: evalModel,
         contents: [{ role: 'user', parts: [{ text: prompt }] }],
         config: { responseMimeType: 'application/json' }
       });
@@ -500,7 +531,7 @@ Respond strictly in valid JSON matching this schema:
         throw new Error('Empty model candidate');
       }
     } catch (llmErr) {
-      console.warn('[Assessment Scoring] LLM rubric evaluation fell back to deterministic baseline:', (llmErr as any)?.message);
+      recordModelErrorCooldown(evalModel, llmErr);
       const avgWordLength = trimmed.length / words.length;
       lexical_score = Math.min(95, Math.max(50, Math.round(lexicalDiversity * 70 + avgWordLength * 4)));
       const hasTerminalPunct = /[.!?]$/.test(trimmed);

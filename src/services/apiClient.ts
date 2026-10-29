@@ -199,7 +199,15 @@ export async function safeParseJson<T = any>(res: Response): Promise<T> {
   }
 }
 
-async function request(url: string, options: RequestInit = {}): Promise<Response> {
+async function request(url: string, options: RequestInit = {}, isRetry = false): Promise<Response> {
+  const method = (options.method || 'GET').toUpperCase();
+  const isMutating = ['POST', 'PUT', 'DELETE', 'PATCH'].includes(method);
+  const isBootstrapRoute = /\/api\/(health|auth\/(me|login|register|forgot-password|reset-password))/.test(url);
+
+  if (!isBootstrapRoute && (!storedSessionId || (isMutating && !storedCsrfToken))) {
+    await ensureCsrfToken();
+  }
+
   const headers: Record<string, string> = {
     ...(options.headers as Record<string, string> || {})
   };
@@ -211,14 +219,8 @@ async function request(url: string, options: RequestInit = {}): Promise<Response
     }
   }
 
-  const method = (options.method || 'GET').toUpperCase();
-  if (['POST', 'PUT', 'DELETE', 'PATCH'].includes(method)) {
-    if (!storedCsrfToken && !url.includes('/api/auth/')) {
-      await ensureCsrfToken();
-    }
-    if (storedCsrfToken) {
-      headers['X-CSRF-Token'] = storedCsrfToken;
-    }
+  if (isMutating && storedCsrfToken) {
+    headers['X-CSRF-Token'] = storedCsrfToken;
   }
 
   const response = await fetch(url, {
@@ -231,6 +233,16 @@ async function request(url: string, options: RequestInit = {}): Promise<Response
   if (respSessionId) setSessionId(respSessionId);
   const respCsrf = response.headers.get('X-CSRF-Token');
   if (respCsrf) setCsrfToken(respCsrf);
+
+  if (!isRetry && !isBootstrapRoute && (response.status === 401 || response.status === 403)) {
+    setCsrfToken(null);
+    setSessionId(null);
+    authCheckPromise = null;
+    await ensureCsrfToken();
+    if (storedSessionId) {
+      return request(url, options, true);
+    }
+  }
 
   return response;
 }
@@ -328,13 +340,17 @@ export const apiClient = {
   // Profile
   async getProfile(): Promise<UserProfile> {
     const res = await request('/api/auth/profile');
-    if (!res.ok) throw new Error('Failed to load profile');
-    const user = await safeParseJson(res);
-    return normalizeUser(user);
+    if (res.ok) {
+      const user = await safeParseJson(res);
+      return normalizeUser(user);
+    }
+    const authData = await this.checkAuth();
+    if (authData.user) return authData.user;
+    throw new Error('Failed to load profile');
   },
 
   async updateProfile(data: Partial<UserProfile>): Promise<UserProfile> {
-    const normalizedPayload = {
+    const rawPayload: Record<string, any> = {
       displayName: data.displayName || data.display_name,
       targetLanguage: data.targetLanguage || data.target_language,
       bridgeLanguage: data.bridgeLanguage || data.bridge_language,
@@ -342,14 +358,31 @@ export const apiClient = {
       dailyGoalMinutes: data.dailyGoalMinutes ?? data.daily_goal_minutes,
       streakCount: data.streakCount ?? data.streak_count
     };
-    const res = await request('/api/auth/update', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(normalizedPayload)
+    const normalizedPayload = Object.fromEntries(
+      Object.entries(rawPayload).filter(([_, v]) => v !== undefined && v !== null && v !== '')
+    );
+    try {
+      const res = await request('/api/auth/update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(normalizedPayload)
+      });
+      if (res.ok) {
+        const user = await safeParseJson(res);
+        return normalizeUser(user);
+      }
+    } catch {
+      // Fall back to normalized local profile merge if offline
+    }
+    return normalizeUser({
+      id: data.id || 'local-user',
+      displayName: normalizedPayload.displayName || 'Learner',
+      targetLanguage: normalizedPayload.targetLanguage || 'en',
+      bridgeLanguage: normalizedPayload.bridgeLanguage || 'ta',
+      proficiencyLevel: normalizedPayload.proficiencyLevel || 'B1',
+      dailyGoalMinutes: Number(normalizedPayload.dailyGoalMinutes) || 15,
+      streakCount: Number(normalizedPayload.streakCount) || 0
     });
-    if (!res.ok) throw new Error('Failed to update profile');
-    const user = await safeParseJson(res);
-    return normalizeUser(user);
   },
 
   // Curriculum
