@@ -1,273 +1,275 @@
-import React, { useState, useEffect } from 'react';
-import { Card, Button, ProgressBar } from './ui';
-import { apiClient } from '../services/apiClient';
+import React, { useState, useRef } from 'react';
+import { Globe, Target, Clock, Sparkles, Check, Mic } from 'lucide-react';
+import { apiClient, UserProfile } from '../services/apiClient.ts';
+import { programApi } from '../services/api/programApi.ts';
+import { AudioRecorder } from '../services/audioRecorder.ts';
+import { AudioLevelMeter } from './audio/AudioLevelMeter.tsx';
+import { AccountConsentStep } from './onboarding/AccountConsentStep.tsx';
+import { Button } from './ui/index.ts';
+import { ctaAnalytics } from '../services/analytics.ts';
 
 interface OnboardingWizardProps {
-  onComplete: (data?: any) => void;
+  onComplete: (profile?: UserProfile, launchBaseline?: boolean) => void;
   onCancel?: () => void;
 }
 
-const STORAGE_KEY = 'luma_onboarding_step_state';
-
-const LANGUAGES_SPOKEN = [
-  { code: 'en', name: 'English', native: 'English' },
-  { code: 'ar', name: 'Arabic', native: 'العربية' },
-  { code: 'es', name: 'Spanish', native: 'Español' },
-  { code: 'ta', name: 'Tamil', native: 'தமிழ்' },
-  { code: 'hi', name: 'Hindi', native: 'हिन्दी' },
-  { code: 'de', name: 'German', native: 'Deutsch' },
-  { code: 'fr', name: 'French', native: 'Français' },
-  { code: 'ja', name: 'Japanese', native: '日本語' }
-];
-
-const LANGUAGES_TO_LEARN = [
-  { code: 'ar', name: 'Arabic (العربية)', native: 'العربية الفصحى', flag: '🇸🇦' },
-  { code: 'en', name: 'English', native: 'English', flag: '🇬🇧' },
-  { code: 'es', name: 'Spanish', native: 'Español', flag: '🇪🇸' },
-  { code: 'de', name: 'German', native: 'Deutsch', flag: '🇩🇪' },
-  { code: 'fr', name: 'French', native: 'Français', flag: '🇫🇷' },
-  { code: 'ja', name: 'Japanese', native: '日本語', flag: '🇯🇵' },
-  { code: 'it', name: 'Italian', native: 'Italiano', flag: '🇮🇹' }
-];
-
-const LEVELS = [
-  { id: 'Beginner', title: 'Beginner', desc: 'Starting from scratch or know a few simple words' },
-  { id: 'Intermediate', title: 'Intermediate', desc: 'Can hold basic conversations and ask questions' },
-  { id: 'Advanced', title: 'Advanced', desc: 'Comfortable speaking, looking for fluency and nuance' }
-];
-
-const DAILY_MINUTES = [5, 10, 15, 20, 30];
-
 export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ onComplete, onCancel }) => {
-  const [step, setStep] = useState<number>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      return saved ? JSON.parse(saved).step || 1 : 1;
-    } catch {
-      return 1;
-    }
-  });
+  const [step, setStep] = useState(1);
+  const totalSteps = 4;
+  const [authMode, setAuthMode] = useState<'guest' | 'register' | 'login'>('register');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [storeAudioSamples, setStoreAudioSamples] = useState(true);
+  const [storeTranscripts, setStoreTranscripts] = useState(true);
+  const [analyticsEnabled, setAnalyticsEnabled] = useState(true);
+  const [nativeLanguage, setNativeLanguage] = useState('ta');
+  const [targetAccent, setTargetAccent] = useState<'en-US' | 'en-IN'>('en-US');
+  const [dailyMinutes, setDailyMinutes] = useState(15);
+  const [micTested, setMicTested] = useState(false);
+  const [isTestingMic, setIsTestingMic] = useState(false);
+  const [micLevel, setMicLevel] = useState(0);
+  const [micNotice, setMicNotice] = useState<string | null>(null);
+  const micRecorderRef = useRef<AudioRecorder | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const [languageSpoken, setLanguageSpoken] = useState('en');
-  const [languageToLearn, setLanguageToLearn] = useState('es');
-  const [level, setLevel] = useState<'Beginner' | 'Intermediate' | 'Advanced'>('Beginner');
-  const [goal, setGoal] = useState('Travel & daily life');
-  const [minutesPerDay, setMinutesPerDay] = useState(15);
-  const [isSaving, setIsSaving] = useState(false);
-
-  // Restore saved answers on mount
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (parsed.languageSpoken) setLanguageSpoken(parsed.languageSpoken);
-        if (parsed.languageToLearn) setLanguageToLearn(parsed.languageToLearn);
-        if (parsed.level) setLevel(parsed.level);
-        if (parsed.goal) setGoal(parsed.goal);
-        if (parsed.minutesPerDay) setMinutesPerDay(parsed.minutesPerDay);
+  const handleStep1Continue = async () => {
+    if (isSubmitting) return;
+    setErrorMessage(null);
+    if (authMode === 'register' || authMode === 'login') {
+      if (!email.trim() || !email.includes('@')) {
+        setErrorMessage('Please enter a valid email address, or choose Guest.');
+        return;
       }
-    } catch {
-      // Ignore parse errors
+      if (authMode === 'register') {
+        const strong = password.length >= 10 && /[A-Z]/.test(password) && /[a-z]/.test(password) && /[0-9]/.test(password) && /[^A-Za-z0-9]/.test(password);
+        if (!strong) {
+          setErrorMessage('Password must be 10+ characters with uppercase, lowercase, number, and symbol.');
+          return;
+        }
+      } else if (!password) {
+        setErrorMessage('Please enter your password.');
+        return;
+      }
     }
-  }, []);
 
-  // Save progress for resumability
-  useEffect(() => {
+    setIsSubmitting(true);
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({
-        step,
-        languageSpoken,
-        languageToLearn,
-        level,
-        goal,
-        minutesPerDay
-      }));
-    } catch {
-      // Storage unavailable
-    }
-  }, [step, languageSpoken, languageToLearn, level, goal, minutesPerDay]);
-
-  const handleFinish = async () => {
-    setIsSaving(true);
-    try {
-      await apiClient.updateProfile({
-        bridge_language: languageSpoken,
-        target_language: languageToLearn,
-        proficiency_level: level,
-        daily_goal_minutes: minutesPerDay
+      ctaAnalytics.setConsent(analyticsEnabled);
+      if (authMode === 'register') {
+        ctaAnalytics.track('registration_started');
+        await apiClient.register({
+          email: email.trim(),
+          password,
+          displayName: email.trim().split('@')[0] || 'Learner',
+          targetLanguage: 'en',
+          bridgeLanguage: nativeLanguage
+        });
+        ctaAnalytics.track('registration_completed');
+      } else if (authMode === 'login') {
+        await apiClient.login({ email: email.trim(), password });
+      }
+      await apiClient.updatePrivacyConsents({
+        store_audio_samples: storeAudioSamples,
+        store_transcripts: storeTranscripts,
+        analytics_enabled: analyticsEnabled
       });
-      localStorage.removeItem(STORAGE_KEY);
-      onComplete({ languageSpoken, languageToLearn, level, minutesPerDay });
-    } catch {
-      // Fallback
-      localStorage.removeItem(STORAGE_KEY);
-      onComplete();
+      setStep(2);
+    } catch (err: any) {
+      setErrorMessage(err.message || 'Account request failed. Please check credentials or choose Guest.');
     } finally {
-      setIsSaving(false);
+      setIsSubmitting(false);
     }
   };
 
-  const progressPercent = Math.round((step / 4) * 100);
+  const handleTestMicrophone = async () => {
+    setMicNotice(null);
+    if (isTestingMic && micRecorderRef.current) {
+      setIsTestingMic(false);
+      await micRecorderRef.current.stop();
+      setMicTested(true);
+      setMicNotice('Microphone verified! Audio signal captured cleanly.');
+      return;
+    }
+    const recorder = new AudioRecorder({
+      maxDurationMs: 6000,
+      onStateChange: (st) => { if (typeof st.level === 'number') setMicLevel(st.level); }
+    });
+    micRecorderRef.current = recorder;
+    const ok = await recorder.start();
+    if (!ok) {
+      ctaAnalytics.track('recording_failed', { stage: 'onboarding_mic_check' });
+      setMicTested(true);
+      setMicNotice('Microphone access is blocked in this preview frame. You can still proceed with interactive coaching.');
+      return;
+    }
+    setIsTestingMic(true);
+    setTimeout(async () => {
+      if (micRecorderRef.current === recorder) {
+        try { await recorder.stop(); } catch {}
+        setIsTestingMic(false);
+        setMicTested(true);
+        setMicNotice('Microphone verified! Audio signal captured cleanly.');
+      }
+    }, 2800);
+  };
+
+  const finalizeOnboarding = async (launchBaseline: boolean) => {
+    if (isSubmitting) return;
+    setIsSubmitting(true);
+    try {
+      await apiClient.saveOnboarding({
+        nativeLanguage,
+        languageToLearn: 'en',
+        learningGoal: 'Workplace & Professional Articulation',
+        dailyMinutes,
+        proficiencyLevel: 'B1'
+      });
+      await programApi.enrollProgram({ nativeLanguage, targetAccent }).catch(() => {});
+      const updated = await apiClient.updateProfile({
+        targetLanguage: 'en',
+        target_language: 'en',
+        bridgeLanguage: nativeLanguage,
+        bridge_language: nativeLanguage,
+        dailyGoalMinutes: dailyMinutes,
+        daily_goal_minutes: dailyMinutes,
+        proficiencyLevel: 'B1',
+        proficiency_level: 'B1'
+      });
+      if (typeof window !== 'undefined') localStorage.setItem('luma_onboarding_done', 'true');
+      ctaAnalytics.track('onboarding_completed', { nativeLanguage, targetAccent, dailyMinutes });
+      onComplete(updated, launchBaseline);
+    } catch {
+      if (typeof window !== 'undefined') localStorage.setItem('luma_onboarding_done', 'true');
+      onComplete(undefined, launchBaseline);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   return (
-    <div className="max-w-[640px] mx-auto px-4 py-8">
-      {/* Header & Progress */}
-      <div className="mb-8 space-y-3">
-        <div className="flex items-center justify-between text-xs text-[var(--muted)] font-medium">
-          <span>Step {step} of 4</span>
-          {onCancel && (
-            <button
-              type="button"
-              onClick={onCancel}
-              className="hover:text-[var(--text)] transition-colors p-1"
-            >
-              Skip setup
-            </button>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="onboarding-title">
+      <div className="w-full max-w-lg rounded-2xl bg-[var(--surface)] border border-[var(--border)] shadow-2xl overflow-hidden">
+        <div className="p-5 border-b border-[var(--border)] flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-[var(--accent)]/15 border border-[var(--accent)]/30 flex items-center justify-center text-[var(--accent)]"><Sparkles className="w-4 h-4" /></div>
+            <div>
+              <h2 id="onboarding-title" className="text-base font-bold text-[var(--text)]">12-Week Articulation Setup</h2>
+              <p className="text-xs text-[var(--muted)]">Step {step} of {totalSteps} • {totalSteps - step} remaining</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-1.5">
+            {[1, 2, 3, 4].map((s) => (
+              <div key={s} className={`h-1.5 rounded-full transition-all ${s <= step ? 'w-6 bg-[var(--accent)]' : 'w-2 bg-[var(--surface-2)]'}`} />
+            ))}
+          </div>
+        </div>
+
+        <div className="p-5 space-y-4 max-h-[75vh] overflow-y-auto">
+          {errorMessage && <div className="p-3 rounded-xl bg-[var(--danger)]/15 border border-[var(--danger)]/40 text-xs text-[var(--danger)] font-medium">{errorMessage}</div>}
+
+          {step === 1 && (
+            <AccountConsentStep
+              authMode={authMode}
+              email={email}
+              password={password}
+              storeAudioSamples={storeAudioSamples}
+              storeTranscripts={storeTranscripts}
+              analyticsEnabled={analyticsEnabled}
+              onAuthModeChange={(m) => { setAuthMode(m); setErrorMessage(null); }}
+              onEmailChange={setEmail}
+              onPasswordChange={setPassword}
+              onStoreAudioChange={setStoreAudioSamples}
+              onStoreTranscriptsChange={setStoreTranscripts}
+              onAnalyticsChange={setAnalyticsEnabled}
+            />
+          )}
+
+          {step === 2 && (
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 text-[var(--text)] font-bold text-sm"><Globe className="w-4 h-4 text-[var(--accent)]" /><span>Native Language & Target English Accent</span></div>
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  { code: 'ta', name: 'Tamil (தமிழ்) → English' },
+                  { code: 'ar', name: 'Arabic (العربية) → English' },
+                  { code: 'hi', name: 'Hindi (हिन्दी) → English' },
+                  { code: 'es', name: 'Spanish (Español) → English' }
+                ].map((lang) => (
+                  <button key={lang.code} type="button" onClick={() => setNativeLanguage(lang.code)} className={`p-2.5 rounded-xl border text-left text-xs font-semibold cursor-pointer flex items-center justify-between ${nativeLanguage === lang.code ? 'bg-[var(--accent)]/15 border-[var(--accent)] text-[var(--text)]' : 'bg-[var(--surface-2)] border-[var(--border)] text-[var(--muted)]'}`}>
+                    <span>{lang.name}</span>
+                    {nativeLanguage === lang.code && <Check className="w-3.5 h-3.5 text-[var(--accent)]" />}
+                  </button>
+                ))}
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                {(['en-US', 'en-IN'] as const).map((acc) => (
+                  <button key={acc} type="button" onClick={() => setTargetAccent(acc)} className={`p-2.5 rounded-xl border text-xs font-semibold cursor-pointer ${targetAccent === acc ? 'bg-[var(--accent)]/15 border-[var(--accent)] text-[var(--text)]' : 'bg-[var(--surface-2)] border-[var(--border)] text-[var(--muted)]'}`}>
+                    {acc === 'en-US' ? 'General American (en-US)' : 'Indian English (en-IN)'}
+                  </button>
+                ))}
+              </div>
+              <div>
+                <div className="flex items-center gap-2 text-xs font-semibold text-[var(--muted)] mb-1.5"><Clock className="w-3.5 h-3.5 text-[var(--accent)]" /><span>Daily Practice Commitment</span></div>
+                <div className="grid grid-cols-4 gap-2">
+                  {[10, 15, 20, 30].map((mins) => (
+                    <button key={mins} type="button" onClick={() => setDailyMinutes(mins)} className={`py-2 rounded-xl border text-xs font-bold cursor-pointer ${dailyMinutes === mins ? 'bg-[var(--accent)] text-white border-[var(--accent)]' : 'bg-[var(--surface-2)] border-[var(--border)] text-[var(--text)]'}`}>
+                      {mins} min
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {step === 3 && (
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 text-[var(--text)] font-bold text-sm"><Mic className="w-4 h-4 text-[var(--accent)]" /><span>Test Your Microphone</span></div>
+              <p className="text-xs text-[var(--muted)] leading-relaxed">Before starting your baseline assessment, verify your microphone input. Your browser will ask for permission to capture your spoken practice.</p>
+              <div className="p-4 rounded-xl bg-[var(--surface-2)] border border-[var(--border)] space-y-3">
+                <AudioLevelMeter level={micLevel} durationMs={0} isRecording={isTestingMic} />
+                <div className="flex items-center justify-between">
+                  <Button variant="secondary" size="sm" onClick={handleTestMicrophone}>
+                    <Mic className="w-4 h-4 mr-1.5 text-[var(--accent)]" />{isTestingMic ? 'Stop Microphone Test' : 'Test Microphone'}
+                  </Button>
+                  {micTested && <span className="text-xs font-bold text-[var(--success)]">✓ Checked</span>}
+                </div>
+                {micNotice && <p className="text-xs text-[var(--muted)]">{micNotice}</p>}
+              </div>
+            </div>
+          )}
+
+          {step === 4 && (
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 text-[var(--text)] font-bold text-sm"><Target className="w-4 h-4 text-[var(--accent)]" /><span>Ready for Your Day-0 Baseline Assessment</span></div>
+              <p className="text-xs text-[var(--muted)] leading-relaxed">
+                Your 12-week program is tailored for <strong>{nativeLanguage.toUpperCase()} → {targetAccent}</strong> ({dailyMinutes} min/day). Start your Day-0 Baseline Assessment to benchmark your starting articulation clarity.
+              </p>
+            </div>
           )}
         </div>
-        <ProgressBar value={progressPercent} label={`Setup progress step ${step} of 4`} showPercentage={false} />
-      </div>
 
-      {/* Step 1: Language you speak */}
-      {step === 1 && (
-        <Card className="space-y-6">
-          <div>
-            <h2 className="text-xl font-bold text-[var(--text)]">Language you speak</h2>
-            <p className="text-sm text-[var(--muted)] mt-1">We will provide explanations and hints in this language.</p>
-          </div>
-          <div className="grid grid-cols-2 gap-2.5" role="radiogroup" aria-label="Language you speak">
-            {LANGUAGES_SPOKEN.map((lang) => (
-              <button
-                key={lang.code}
-                type="button"
-                role="radio"
-                aria-checked={languageSpoken === lang.code}
-                onClick={() => setLanguageSpoken(lang.code)}
-                className={`min-h-[48px] p-3 text-left rounded-xl border text-sm font-medium transition-all ${
-                  languageSpoken === lang.code
-                    ? 'border-[var(--accent)] bg-[var(--surface-2)] text-[var(--text)] shadow-sm'
-                    : 'border-[var(--border)] bg-[var(--surface)] text-[var(--muted)] hover:border-[var(--accent)]'
-                }`}
-              >
-                {lang.name}
-              </button>
-            ))}
-          </div>
-          <Button variant="primary" fullWidth onClick={() => setStep(2)}>
-            Continue
-          </Button>
-        </Card>
-      )}
+        <div className="p-5 border-t border-[var(--border)] bg-[var(--surface-2)]/50 flex items-center justify-between gap-2">
+          {step > 1 ? (
+            <Button variant="ghost" size="sm" onClick={() => setStep(step - 1)} disabled={isSubmitting}>Back</Button>
+          ) : onCancel ? (
+            <Button variant="ghost" size="sm" onClick={onCancel} disabled={isSubmitting}>Later</Button>
+          ) : <div />}
 
-      {/* Step 2: Language you want to learn */}
-      {step === 2 && (
-        <Card className="space-y-6">
-          <div>
-            <h2 className="text-xl font-bold text-[var(--text)]">Language you want to learn</h2>
-            <p className="text-sm text-[var(--muted)] mt-1">Your conversational practice will focus on this language.</p>
-          </div>
-          <div className="grid grid-cols-2 gap-2.5" role="radiogroup" aria-label="Language you want to learn">
-            {LANGUAGES_TO_LEARN.map((lang) => (
-              <button
-                key={lang.code}
-                type="button"
-                role="radio"
-                aria-checked={languageToLearn === lang.code}
-                onClick={() => setLanguageToLearn(lang.code)}
-                className={`min-h-[48px] p-3 text-left rounded-xl border text-sm font-medium transition-all ${
-                  languageToLearn === lang.code
-                    ? 'border-[var(--accent)] bg-[var(--surface-2)] text-[var(--text)] shadow-sm'
-                    : 'border-[var(--border)] bg-[var(--surface)] text-[var(--muted)] hover:border-[var(--accent)]'
-                }`}
-              >
-                <div className="flex items-center justify-between w-full">
-                  <span>{lang.name}</span>
-                  {lang.flag && <span className="text-base" aria-hidden="true">{lang.flag}</span>}
-                </div>
-                {lang.native && <div className="text-xs text-[var(--muted)] mt-0.5">{lang.native}</div>}
-              </button>
-            ))}
-          </div>
-          <div className="flex gap-3">
-            <Button variant="secondary" onClick={() => setStep(1)}>Back</Button>
-            <Button variant="primary" fullWidth onClick={() => setStep(3)}>Continue</Button>
-          </div>
-        </Card>
-      )}
-
-      {/* Step 3: Your level and goal */}
-      {step === 3 && (
-        <Card className="space-y-6">
-          <div>
-            <h2 className="text-xl font-bold text-[var(--text)]">Your level and goal</h2>
-            <p className="text-sm text-[var(--muted)] mt-1">Help us tailor lesson pacing and vocabulary difficulty.</p>
-          </div>
-          <div className="space-y-2.5" role="radiogroup" aria-label="Your proficiency level">
-            {LEVELS.map((lvl) => (
-              <button
-                key={lvl.id}
-                type="button"
-                role="radio"
-                aria-checked={level === lvl.id}
-                onClick={() => setLevel(lvl.id as any)}
-                className={`w-full min-h-[56px] p-3.5 text-left rounded-xl border transition-all ${
-                  level === lvl.id
-                    ? 'border-[var(--accent)] bg-[var(--surface-2)] text-[var(--text)]'
-                    : 'border-[var(--border)] bg-[var(--surface)] text-[var(--muted)] hover:border-[var(--accent)]'
-                }`}
-              >
-                <div className="font-semibold text-sm text-[var(--text)]">{lvl.title}</div>
-                <div className="text-xs text-[var(--muted)] mt-0.5">{lvl.desc}</div>
-              </button>
-            ))}
-          </div>
-          <div className="flex gap-3 pt-2">
-            <Button variant="secondary" onClick={() => setStep(2)}>Back</Button>
-            <Button variant="primary" fullWidth onClick={() => setStep(4)}>Continue</Button>
-          </div>
-        </Card>
-      )}
-
-      {/* Step 4: Minutes per day */}
-      {step === 4 && (
-        <Card className="space-y-6">
-          <div>
-            <h2 className="text-xl font-bold text-[var(--text)]">Minutes per day</h2>
-            <p className="text-sm text-[var(--muted)] mt-1">Consistency is key. Even 10 minutes a day builds fluency.</p>
-          </div>
-          <div className="flex flex-wrap gap-2.5 justify-center py-2" role="radiogroup" aria-label="Minutes per day">
-            {DAILY_MINUTES.map((mins) => (
-              <button
-                key={mins}
-                type="button"
-                role="radio"
-                aria-checked={minutesPerDay === mins}
-                onClick={() => setMinutesPerDay(mins)}
-                className={`min-h-[48px] min-w-[72px] px-4 py-2 rounded-xl border text-sm font-bold transition-all ${
-                  minutesPerDay === mins
-                    ? 'border-[var(--accent)] bg-[var(--accent)] text-[var(--accent-contrast)] shadow-md'
-                    : 'border-[var(--border)] bg-[var(--surface)] text-[var(--text)] hover:border-[var(--accent)]'
-                }`}
-              >
-                {mins} min
-              </button>
-            ))}
-          </div>
-          <div className="flex gap-3 pt-4">
-            <Button variant="secondary" onClick={() => setStep(3)}>Back</Button>
-            <Button
-              variant="primary"
-              fullWidth
-              isLoading={isSaving}
-              disabled={isSaving}
-              onClick={handleFinish}
-            >
-              Start learning
+          {step === 1 && (
+            <Button variant="primary" onClick={handleStep1Continue} isLoading={isSubmitting}>
+              {authMode === 'register' ? 'Create Account' : authMode === 'login' ? 'Sign In & Continue' : 'Continue'}
             </Button>
-          </div>
-        </Card>
-      )}
+          )}
+          {step === 2 && <Button variant="primary" onClick={() => setStep(3)}>Continue</Button>}
+          {step === 3 && <Button variant="primary" onClick={() => setStep(4)}>Continue</Button>}
+          {step === 4 && (
+            <div className="flex items-center gap-2">
+              <Button variant="secondary" size="sm" onClick={() => finalizeOnboarding(false)} disabled={isSubmitting}>Skip to Home</Button>
+              <Button variant="primary" onClick={() => finalizeOnboarding(true)} isLoading={isSubmitting}>Start Baseline Assessment</Button>
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 };

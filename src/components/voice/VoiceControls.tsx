@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Mic, MicOff, MessageSquare, Send, RotateCcw, Gauge } from 'lucide-react';
+import { Mic, MicOff, MessageSquare, Send, RotateCcw, Gauge, Square } from 'lucide-react';
 import { VoiceSessionState } from '../orb/types.ts';
 import { Button } from '../ui/Button.tsx';
 import { AudioWaveVisualizer } from '../audio/AudioWaveVisualizer.tsx';
@@ -11,6 +11,7 @@ interface VoiceControlsProps {
   audioLevel?: number;
   textInput: string;
   onToggleMic: () => void;
+  onStopSpeaking?: () => void;
   onRepeatLastReply: () => void;
   onToggleSlowerSpeech: () => void;
   onTextInputChange: (val: string) => void;
@@ -24,6 +25,7 @@ export const VoiceControls: React.FC<VoiceControlsProps> = ({
   audioLevel = 0,
   textInput,
   onToggleMic,
+  onStopSpeaking,
   onRepeatLastReply,
   onToggleSlowerSpeech,
   onTextInputChange,
@@ -31,23 +33,27 @@ export const VoiceControls: React.FC<VoiceControlsProps> = ({
 }) => {
   const [showTextInput, setShowTextInput] = useState(false);
 
-  const getStatusText = (): string => {
+  const getPrimaryLabel = (): string => {
+    if (isListening) return 'Stop Recording';
     switch (orbState) {
-      case 'listening': return 'Listening...';
-      case 'transcribing': return 'Processing...';
-      case 'thinking': return 'Thinking...';
-      case 'speaking': return 'Speaking...';
-      case 'offline_error': return 'Coach unavailable';
+      case 'transcribing':
+        return 'Processing Speech...';
+      case 'thinking':
+        return 'Coach Thinking...';
+      case 'speaking':
+        return 'Interrupt & Speak';
+      case 'offline_error':
+        return 'Retry Microphone';
       case 'idle':
       default:
-        return 'Tap to Speak';
+        return 'Start Speaking';
     }
   };
 
-  const statusWord = getStatusText();
+  const primaryLabel = getPrimaryLabel();
 
   return (
-    <div 
+    <div
       className="p-3.5 border-t border-[var(--border)] bg-[var(--surface)]/95 backdrop-blur-md"
       role="region"
       aria-label="Voice conversation controls"
@@ -56,92 +62,113 @@ export const VoiceControls: React.FC<VoiceControlsProps> = ({
         {showTextInput ? (
           <div className="flex items-center gap-2">
             <button
+              type="button"
               onClick={() => setShowTextInput(false)}
-              className="h-11 px-3 rounded-xl bg-[var(--surface-2)] text-[var(--text)] border border-[var(--border)] hover:border-cyan-400 transition-colors inline-flex items-center justify-center shrink-0 cursor-pointer"
-              title="Switch back to voice"
+              className="h-11 px-3 rounded-xl bg-[var(--surface-2)] text-[var(--text)] border border-[var(--border)] hover:border-[var(--accent)] transition-colors inline-flex items-center justify-center gap-1.5 text-xs font-semibold shrink-0 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
+              title="Switch back to voice microphone"
               aria-label="Switch back to microphone"
             >
-              <Mic className="w-4 h-4 text-cyan-400" />
+              <Mic className="w-4 h-4 text-[var(--accent)]" />
+              <span className="hidden sm:inline">Voice</span>
             </button>
             <input
               type="text"
               value={textInput}
               onChange={(e) => onTextInputChange(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && onSendTextMessage()}
-              placeholder="Ask coach or practice phrase..."
+              onKeyDown={(e) => e.key === 'Enter' && textInput.trim() && onSendTextMessage()}
+              placeholder="Type a response or phrase to practice..."
               aria-label="Message to coach"
-              className="flex-1 h-11 px-4 rounded-xl bg-[var(--surface-2)] text-[var(--text)] border border-[var(--border)] focus:border-indigo-500 text-sm outline-none transition-colors"
+              className="flex-1 h-11 px-4 rounded-xl bg-[var(--surface-2)] text-[var(--text)] border border-[var(--border)] focus:border-[var(--accent)] text-sm outline-none transition-colors"
               autoFocus
             />
             <Button
               variant="primary"
               onClick={onSendTextMessage}
               disabled={!textInput.trim()}
-              className="h-11 shrink-0 bg-gradient-to-r from-indigo-600 to-cyan-600 border-none shadow-md"
-              aria-label="Send message"
+              className="h-11 shrink-0"
+              aria-label="Send message to coach"
             >
               <Send className="w-4 h-4 mr-1.5" />
               <span>Send</span>
             </Button>
           </div>
         ) : (
-          <div className="flex items-center justify-between gap-2.5">
-            {/* Repeat coach audio */}
-            <button
-              onClick={onRepeatLastReply}
-              className="h-11 px-3.5 rounded-xl bg-[var(--surface-2)] text-[var(--text)] border border-[var(--border)] hover:border-indigo-400/50 transition-all inline-flex items-center justify-center gap-1.5 text-xs font-semibold cursor-pointer shadow-sm active:scale-95"
-              title="Replay coach audio"
-              aria-label="Replay coach audio"
-            >
-              <RotateCcw className="w-4 h-4 text-[var(--muted)]" />
-              <span className="hidden sm:inline">Replay</span>
-            </button>
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={onRepeatLastReply}
+                className="h-11 px-3 rounded-xl bg-[var(--surface-2)] text-[var(--text)] border border-[var(--border)] hover:border-[var(--accent)] transition-all inline-flex items-center justify-center gap-1.5 text-xs font-semibold cursor-pointer active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
+                title="Replay last coach audio"
+                aria-label="Replay coach audio"
+              >
+                <RotateCcw className="w-4 h-4 text-[var(--muted)]" />
+                <span className="hidden sm:inline">Replay</span>
+              </button>
 
-            {/* Glowing Center Microphone Button */}
+              {orbState === 'speaking' && onStopSpeaking && (
+                <button
+                  type="button"
+                  onClick={onStopSpeaking}
+                  className="h-11 px-3 rounded-xl bg-[var(--danger)]/15 text-[var(--danger)] border border-[var(--danger)]/40 hover:bg-[var(--danger)]/25 transition-all inline-flex items-center justify-center gap-1.5 text-xs font-semibold cursor-pointer active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--danger)]"
+                  title="Stop coach audio playback"
+                  aria-label="Stop coach audio"
+                >
+                  <Square className="w-3.5 h-3.5 fill-current" />
+                  <span className="hidden sm:inline">Stop Audio</span>
+                </button>
+              )}
+            </div>
+
             <button
+              type="button"
               onClick={onToggleMic}
+              disabled={orbState === 'transcribing' || orbState === 'thinking'}
               aria-pressed={isListening}
-              aria-label={`${statusWord} - click to toggle speech input`}
-              className={`flex-1 max-w-[280px] h-12 px-6 rounded-full font-bold text-sm inline-flex items-center justify-center gap-2.5 transition-all duration-200 cursor-pointer select-none shadow-lg active:scale-95 ${
+              aria-label={primaryLabel}
+              className={`flex-1 max-w-[270px] h-12 px-5 rounded-full font-bold text-sm inline-flex items-center justify-center gap-2.5 transition-all duration-200 cursor-pointer select-none shadow-md active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] ${
                 isListening
-                  ? 'bg-gradient-to-r from-rose-500 to-red-600 text-white shadow-rose-500/30 animate-pulse'
-                  : 'bg-gradient-to-r from-indigo-600 via-blue-600 to-cyan-500 text-white hover:shadow-cyan-500/25 shadow-indigo-600/25'
+                  ? 'bg-[var(--danger)] text-white'
+                  : 'bg-[var(--accent)] text-white hover:opacity-95'
               }`}
             >
               {isListening ? (
                 <>
-                  <MicOff className="w-4 h-4 text-white" />
+                  <MicOff className="w-4 h-4 text-white shrink-0" />
+                  <span>Stop Recording</span>
                   <AudioWaveVisualizer isActive={true} audioLevel={audioLevel} barCount={4} colorScheme="cyan" />
                 </>
               ) : (
                 <>
-                  <Mic className="w-4 h-4 text-white" />
-                  <span>{statusWord}</span>
+                  <Mic className="w-4 h-4 text-white shrink-0" />
+                  <span className="truncate">{primaryLabel}</span>
                 </>
               )}
             </button>
 
-            {/* Slower & Type toggles */}
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5">
               <button
+                type="button"
                 onClick={onToggleSlowerSpeech}
-                className={`h-11 px-3 rounded-xl border text-xs font-semibold transition-all inline-flex items-center justify-center gap-1.5 cursor-pointer shadow-sm active:scale-95 ${
+                className={`h-11 px-3 rounded-xl border text-xs font-semibold transition-all inline-flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] ${
                   isSlowerSpeech
-                    ? 'bg-amber-500/15 border-amber-400 text-amber-300'
-                    : 'bg-[var(--surface-2)] border-[var(--border)] text-[var(--text)] hover:border-indigo-400/50'
+                    ? 'bg-[var(--warning)]/15 border-[var(--warning)] text-[var(--warning)]'
+                    : 'bg-[var(--surface-2)] border-[var(--border)] text-[var(--text)] hover:border-[var(--accent)]'
                 }`}
-                title={isSlowerSpeech ? '0.8x Slow Pacing active' : 'Switch to 0.8x slow pacing'}
+                title={isSlowerSpeech ? '0.8x Slow Pace active — click for 1.0x Normal Pace' : 'Switch to 0.8x Slow Pace'}
                 aria-pressed={isSlowerSpeech}
+                aria-label={isSlowerSpeech ? '0.8x Slow Pace active' : '1.0x Normal Pace'}
               >
                 <Gauge className="w-4 h-4 text-[var(--muted)]" />
-                <span className="hidden sm:inline">{isSlowerSpeech ? '0.8x' : '1.0x'}</span>
+                <span className="hidden sm:inline">{isSlowerSpeech ? '0.8x Slow' : '1.0x Pace'}</span>
               </button>
 
               <button
+                type="button"
                 onClick={() => setShowTextInput(true)}
-                className="h-11 px-3 rounded-xl bg-[var(--surface-2)] text-[var(--text)] border border-[var(--border)] hover:border-indigo-400/50 transition-all inline-flex items-center justify-center gap-1.5 text-xs font-semibold cursor-pointer shadow-sm active:scale-95"
-                title="Type instead of speaking"
-                aria-label="Type instead"
+                className="h-11 px-3 rounded-xl bg-[var(--surface-2)] text-[var(--text)] border border-[var(--border)] hover:border-[var(--accent)] transition-all inline-flex items-center justify-center gap-1.5 text-xs font-semibold cursor-pointer active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
+                title="Type message instead of speaking"
+                aria-label="Type message instead of speaking"
               >
                 <MessageSquare className="w-4 h-4 text-[var(--muted)]" />
                 <span className="hidden md:inline">Type</span>

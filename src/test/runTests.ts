@@ -8,27 +8,30 @@ import { runAudioStorageTests } from './audioStorage.test.ts';
 import { runScoringProviderTests } from './scoringProvider.test.ts';
 import { runSpeechServicesTests } from './speechServices.test.ts';
 import { runArticulationContentTests } from './articulationContent.test.ts';
+import { runCtaFlowTests } from './ctaFlows.test.ts';
 
 async function main() {
   console.log('--- Starting LUMA Automated System & Security Test Suite ---');
-  console.log('[1/9] Running system verification tests...');
+  console.log('[1/10] Running system verification tests...');
   const sysResult = await runAllLumaTests();
-  console.log('[2/9] Running database & migration tests...');
+  console.log('[2/10] Running database & migration tests...');
   const dbResult = await runDatabaseMigrationTests();
-  console.log('[3/9] Running audio capture & storage tests...');
+  console.log('[3/10] Running audio capture & storage tests...');
   const audioResult = await runAudioStorageTests();
-  console.log('[4/9] Running pronunciation scoring tests...');
+  console.log('[4/10] Running pronunciation scoring tests...');
   const scoreResult = await runScoringProviderTests();
-  console.log('[5/9] Running speech & reference audio tests...');
+  console.log('[5/10] Running speech & reference audio tests...');
   const speechResult = await runSpeechServicesTests();
-  console.log('[6/9] Running articulation content & confusion map tests...');
+  console.log('[6/10] Running articulation content & confusion map tests...');
   const articulationResult = await runArticulationContentTests();
-  console.log('[7/9] Running security hardening tests...');
+  console.log('[7/10] Running security hardening tests...');
   const secResults = await runSecurityTests();
-  console.log('[8/9] Running layout overlap prevention tests...');
+  console.log('[8/10] Running layout overlap prevention tests...');
   const layoutResults = await runLayoutTests();
-  console.log('[9/9] Running HTTP API & health probe tests...');
+  console.log('[9/10] Running HTTP API & health probe tests...');
   const httpResults = await runHttpApiTests();
+  console.log('[10/10] Running CTA hierarchy & user flow tests...');
+  const ctaResults = await runCtaFlowTests();
   console.log('Completed all test suites. Compiling results...');
 
   const dbFormattedResults = [
@@ -94,7 +97,8 @@ async function main() {
     ...articulationFormattedResults,
     ...secResults.map(r => ({ ...r, durationMs: 0 })),
     ...layoutResults.map(r => ({ ...r, durationMs: 0 })),
-    ...httpResults.map(r => ({ ...r, durationMs: 0 }))
+    ...httpResults.map(r => ({ ...r, durationMs: 0 })),
+    ...ctaResults.map(r => ({ ...r, durationMs: 0 }))
   ];
 
   const total = allResults.length;

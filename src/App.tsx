@@ -1,271 +1,278 @@
 import React, { useState, useEffect, Suspense, lazy } from 'react';
-import { Navbar } from './components/Navbar';
-import { DailyMissionHub } from './components/DailyMissionHub';
-import { OfflineBanner, Skeleton } from './components/ui';
-import { ErrorBoundary } from './components/ErrorBoundary';
-import { apiClient, UserProfile } from './services/apiClient';
+import { Home, Mic, BookOpen, BarChart3 } from 'lucide-react';
+import { Navbar } from './components/Navbar.tsx';
+import { DailyMissionHub } from './components/DailyMissionHub.tsx';
+import { OnboardingWizard } from './components/OnboardingWizard.tsx';
+import { SettingsModal } from './components/SettingsModal.tsx';
+import { BaselineAssessmentModal } from './components/BaselineAssessmentModal.tsx';
+import { OfflineBanner } from './components/ui/OfflineBanner.tsx';
+import { Skeleton } from './components/ui/Skeleton.tsx';
+import { apiClient, UserProfile } from './services/apiClient.ts';
+import { ctaAnalytics } from './services/analytics.ts';
 
-const VoiceSessionView = lazy(() => import('./components/VoiceSessionView').then(m => ({ default: m.VoiceSessionView })));
-const LearnTabView = lazy(() => import('./components/LearnTabView').then(m => ({ default: m.LearnTabView })));
-const ProgressTabView = lazy(() => import('./components/ProgressTabView').then(m => ({ default: m.ProgressTabView })));
-const OnboardingWizard = lazy(() => import('./components/OnboardingWizard').then(m => ({ default: m.OnboardingWizard })));
-const SettingsModal = lazy(() => import('./components/SettingsModal').then(m => ({ default: m.SettingsModal })));
+const VoiceSessionView = lazy(() =>
+  import('./components/VoiceSessionView.tsx').then((m) => ({ default: m.VoiceSessionView }))
+);
+const LearnTabView = lazy(() =>
+  import('./components/LearnTabView.tsx').then((m) => ({ default: m.LearnTabView }))
+);
+const ProgressTabView = lazy(() =>
+  import('./components/ProgressTabView.tsx').then((m) => ({ default: m.ProgressTabView }))
+);
 
-type TabId = 'home' | 'talk' | 'learn' | 'progress';
-
-const TABS: { id: TabId; label: string; icon: string }[] = [
-  { id: 'home', label: 'Home', icon: '🏠' },
-  { id: 'talk', label: 'Talk', icon: '🎙️' },
-  { id: 'learn', label: 'Learn', icon: '📖' },
-  { id: 'progress', label: 'Progress', icon: '📈' }
-];
+type MainTab = 'home' | 'practice' | 'learn' | 'progress';
 
 export default function App() {
-  const [activeTab, setActiveTabState] = useState<TabId>('home');
-  const [theme, setTheme] = useState<'dark' | 'light'>('dark');
-  const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [curriculum, setCurriculum] = useState<any | null>(null);
-  const [showOnboarding, setShowOnboarding] = useState<boolean>(false);
-  const [showSettings, setShowSettings] = useState<boolean>(false);
-  const [settingsSection, setSettingsSection] = useState<'settings' | 'privacy'>('settings');
-  const [voiceInitialLessonId, setVoiceInitialLessonId] = useState<string | undefined>(undefined);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [activeTab, setActiveTab] = useState<MainTab>('home');
+  const [learnSubTab, setLearnSubTab] = useState<'lessons' | 'words' | 'explain'>('lessons');
+  const [theme, setTheme] = useState<'dark' | 'light'>(() => {
+    const saved = localStorage.getItem('luma_theme');
+    return saved === 'light' || saved === 'dark' ? saved : 'dark';
+  });
 
-  // Router: sync tab with URL path (/home, /talk, /learn, /progress, /settings)
-  const navigateTo = (tab: TabId) => {
-    setActiveTabState(tab);
-    if (typeof window !== 'undefined') {
-      const targetPath = `/${tab}`;
-      if (window.location.pathname !== targetPath) {
-        window.history.pushState({ tab }, '', targetPath);
-      }
-    }
-  };
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [loadingProfile, setLoadingProfile] = useState(true);
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  const [showBaselineModal, setShowBaselineModal] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [settingsSection, setSettingsSection] = useState<'settings' | 'privacy'>('settings');
+  const [activeLessonId, setActiveLessonId] = useState<string | undefined>(undefined);
 
   useEffect(() => {
-    const handlePopState = () => {
-      const path = window.location.pathname.replace(/^\//, '').split('/')[0] ||
-                   window.location.hash.replace(/^#\/?/, '').split('/')[0];
-      if (['home', 'talk', 'learn', 'progress'].includes(path)) {
-        setActiveTabState(path as TabId);
-      } else if (path === 'settings') {
-        setShowSettings(true);
-      } else {
-        setActiveTabState('home');
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('luma_theme', theme);
+  }, [theme]);
+
+  useEffect(() => {
+    const initApp = async () => {
+      setLoadingProfile(true);
+      try {
+        const userProfile = await apiClient.getProfile();
+        setProfile(userProfile);
+
+        const onboardedLocal = localStorage.getItem('luma_onboarding_done') === 'true';
+        if (!userProfile.email && !onboardedLocal) {
+          setShowOnboarding(true);
+        }
+      } catch {
+        // Guest fallback
+      } finally {
+        setLoadingProfile(false);
       }
     };
-
-    handlePopState();
-    window.addEventListener('popstate', handlePopState);
-    return () => window.removeEventListener('popstate', handlePopState);
+    initApp();
   }, []);
 
-  // Theme setup: follow system if no preference, allow manual toggle
-  useEffect(() => {
-    const saved = localStorage.getItem('luma_theme') as 'dark' | 'light' | null;
-    const initial = saved || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
-    applyTheme(initial);
-  }, []);
-
-  const applyTheme = (t: 'dark' | 'light') => {
-    setTheme(t);
-    localStorage.setItem('luma_theme', t);
-    document.documentElement.setAttribute('data-theme', t);
-    document.documentElement.classList.toggle('dark', t === 'dark');
+  const handleStartPractice = (lessonId?: string) => {
+    if (lessonId) setActiveLessonId(lessonId);
+    setActiveTab('practice');
+    ctaAnalytics.track('daily_session_started');
   };
 
-  // Initial data load
-  useEffect(() => {
-    let active = true;
-    setIsLoading(true);
-
-    apiClient.checkAuth()
-      .then(async (authRes) => {
-        if (!active) return;
-        if (authRes.user) {
-          setProfile(authRes.user);
-        }
-        try {
-          const curr = await apiClient.getPersonalizedCurriculum();
-          if (active && curr) setCurriculum(curr);
-        } catch {
-          // Graceful fallback
-        }
-      })
-      .catch(() => {})
-      .finally(() => {
-        if (active) setIsLoading(false);
-      });
-
-    return () => { active = false; };
-  }, []);
-
-  const handleUpdateProfile = async (updates: Partial<UserProfile>) => {
-    try {
-      const updated = await apiClient.updateProfile(updates);
-      setProfile((prev) => ({ ...(prev || {}), ...updated, ...updates }));
-    } catch {
-      setProfile((prev) => (prev ? { ...prev, ...updates } : null));
+  const handleNavigateTab = (tab: string) => {
+    if (tab.startsWith('learn:')) {
+      const sub = tab.split(':')[1] as 'lessons' | 'words' | 'explain';
+      setLearnSubTab(sub);
+      setActiveTab('learn');
+      return;
     }
+    if (tab === 'talk' || tab === 'practice') {
+      setActiveTab('practice');
+      return;
+    }
+    if (tab === 'learn') {
+      setLearnSubTab('lessons');
+      setActiveTab('learn');
+      return;
+    }
+    if (tab === 'progress') {
+      setActiveTab('progress');
+      return;
+    }
+    setActiveTab('home');
   };
 
-  const handleStartPracticeWithLesson = (lessonId?: string, topic?: string) => {
-    setVoiceInitialLessonId(lessonId);
-    navigateTo('talk');
+  const handleLogout = () => {
+    apiClient.logout().catch(() => {});
+    localStorage.removeItem('luma_onboarding_done');
+    setProfile(null);
+    setShowSettings(false);
+    setShowOnboarding(true);
   };
 
-  const openSettingsModal = (section: 'settings' | 'privacy' = 'settings') => {
-    setSettingsSection(section);
-    setShowSettings(true);
-  };
-
-  const handleLanguageChange = async (newLang: string) => {
-    handleUpdateProfile({ target_language: newLang, targetLanguage: newLang });
-    try {
-      const updatedCurriculum = await apiClient.getCurriculum(newLang);
-      if (updatedCurriculum && updatedCurriculum.length > 0) {
-        setCurriculum({ modules: updatedCurriculum });
-      }
-    } catch {}
-  };
+  const navItems: { id: MainTab; label: string; icon: React.ReactNode }[] = [
+    { id: 'home', label: 'Home', icon: <Home className="w-4 h-4" /> },
+    { id: 'practice', label: 'Practice', icon: <Mic className="w-4 h-4" /> },
+    { id: 'learn', label: 'Learn', icon: <BookOpen className="w-4 h-4" /> },
+    { id: 'progress', label: 'Progress', icon: <BarChart3 className="w-4 h-4" /> },
+  ];
 
   return (
-    <div className="min-h-screen flex flex-col bg-[var(--bg)] text-[var(--text)] transition-colors duration-200">
+    <div className="min-h-screen flex flex-col bg-[var(--bg)] text-[var(--text)] transition-colors duration-300">
       <OfflineBanner />
 
-      {/* Top Bar */}
       <Navbar
         profile={profile}
-        onOpenSettings={openSettingsModal}
         theme={theme}
-        setTheme={applyTheme}
-        onNavigateHome={() => navigateTo('home')}
-        onLanguageChange={handleLanguageChange}
+        setTheme={setTheme}
+        onNavigateHome={() => setActiveTab('home')}
+        onOpenSettings={(sec = 'settings') => {
+          setSettingsSection(sec);
+          setShowSettings(true);
+        }}
+        onLanguageChange={(lang) => {
+          apiClient
+            .updateProfile({ targetLanguage: lang, target_language: lang })
+            .then(setProfile)
+            .catch(() => {});
+        }}
       />
 
-      <div className="flex-1 flex max-w-[1200px] w-full mx-auto">
-        {/* Left Rail (Visible at >= 1024px) */}
-        <aside
-          className="hidden lg:flex flex-col w-60 border-r border-[var(--border)] py-6 px-4 space-y-1.5 shrink-0"
-          aria-label="Desktop primary navigation"
-        >
-          {TABS.map((tab) => {
-            const isActive = activeTab === tab.id;
+      {/* Primary Section Navigation Bar */}
+      <nav
+        aria-label="Primary sections"
+        className="w-full border-b border-[var(--border)] bg-[var(--surface)]/75 backdrop-blur-md px-4"
+      >
+        <div className="max-w-[960px] mx-auto flex items-center gap-2 py-2 overflow-x-auto">
+          {navItems.map((item) => {
+            const isActive = activeTab === item.id;
             return (
               <button
-                key={tab.id}
+                key={item.id}
                 type="button"
-                onClick={() => navigateTo(tab.id)}
-                className={`min-h-[44px] flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-semibold transition-all cursor-pointer ${
-                  isActive
-                    ? 'bg-[var(--surface-2)] text-[var(--accent)] border border-[var(--border)] shadow-xs'
-                    : 'text-[var(--muted)] hover:text-[var(--text)] hover:bg-[var(--surface)]'
-                }`}
+                onClick={() => setActiveTab(item.id)}
                 aria-current={isActive ? 'page' : undefined}
+                className={`px-4 py-2 rounded-xl text-xs font-bold inline-flex items-center gap-2 transition-all cursor-pointer ${
+                  isActive
+                    ? 'bg-[var(--accent)] text-white shadow-xs'
+                    : 'text-[var(--muted)] hover:text-[var(--text)] hover:bg-[var(--surface-2)]'
+                }`}
               >
-                <span className="text-lg" aria-hidden="true">{tab.icon}</span>
-                <span>{tab.label}</span>
+                {item.icon}
+                <span>{item.label}</span>
               </button>
             );
           })}
-        </aside>
-
-        {/* Main Content Area */}
-        <main className="flex-1 min-w-0 max-w-[960px] mx-auto w-full px-4 sm:px-6 py-6 pb-24 lg:pb-8" id="main-content">
-          <ErrorBoundary>
-            {showOnboarding ? (
-              <Suspense fallback={<div className="space-y-4 pt-4"><Skeleton height={40} width={240} /><Skeleton height={180} /></div>}>
-                <OnboardingWizard
-                  onComplete={() => {
-                    setShowOnboarding(false);
-                    navigateTo('home');
-                  }}
-                  onCancel={() => setShowOnboarding(false)}
-                />
-              </Suspense>
-            ) : isLoading ? (
-              <div className="space-y-6 pt-4">
-                <Skeleton height={40} width={240} />
-                <Skeleton height={200} />
-                <div className="grid grid-cols-2 gap-4">
-                  <Skeleton height={96} />
-                  <Skeleton height={96} />
-                </div>
-              </div>
-            ) : (
-              <Suspense fallback={<div className="space-y-4 pt-4"><Skeleton height={40} width={240} /><Skeleton height={180} /></div>}>
-                {activeTab === 'home' && (
-                  <DailyMissionHub
-                    curriculum={curriculum}
-                    profile={profile}
-                    onRetakeOnboarding={() => setShowOnboarding(true)}
-                    onSwitchToVoiceTutor={() => navigateTo('talk')}
-                  />
-                )}
-
-                {activeTab === 'talk' && (
-                  <VoiceSessionView
-                    profile={profile}
-                    initialLessonId={voiceInitialLessonId}
-                    onNavigateTab={(tab) => navigateTo(tab as TabId)}
-                  />
-                )}
-
-                {activeTab === 'learn' && (
-                  <LearnTabView
-                    profile={profile}
-                    onStartPractice={handleStartPracticeWithLesson}
-                  />
-                )}
-
-                {activeTab === 'progress' && (
-                  <ProgressTabView
-                    profile={profile}
-                  />
-                )}
-              </Suspense>
-            )}
-          </ErrorBoundary>
-        </main>
-      </div>
-
-      {/* Mobile Bottom Tab Bar (Hidden at >= 1024px) */}
-      <nav
-        className="lg:hidden fixed bottom-0 left-0 right-0 z-30 h-16 border-t border-[var(--border)] bg-[var(--surface)]/95 backdrop-blur-md flex items-center justify-around px-2"
-        aria-label="Mobile navigation bar"
-      >
-        {TABS.map((tab) => {
-          const isActive = activeTab === tab.id;
-          return (
-            <button
-              key={tab.id}
-              type="button"
-              onClick={() => navigateTo(tab.id)}
-              className={`min-h-[44px] min-w-[64px] flex flex-col items-center justify-center gap-0.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
-                isActive ? 'text-[var(--accent)]' : 'text-[var(--muted)] hover:text-[var(--text)]'
-              }`}
-              aria-current={isActive ? 'page' : undefined}
-            >
-              <span className="text-lg leading-none" aria-hidden="true">{tab.icon}</span>
-              <span className="text-[11px] leading-tight font-medium">{tab.label}</span>
-            </button>
-          );
-        })}
+        </div>
       </nav>
 
-      {/* Settings & Privacy Dialog */}
-      <Suspense fallback={null}>
-        {showSettings && (
-          <SettingsModal
-            isOpen={showSettings}
-            onClose={() => setShowSettings(false)}
-            profile={profile}
-            theme={theme}
-            setTheme={applyTheme}
-            onUpdateProfile={handleUpdateProfile}
-          />
+      <main className="flex-1 flex flex-col">
+        {loadingProfile ? (
+          <div className="w-full max-w-4xl mx-auto px-4 py-8 space-y-6">
+            <Skeleton className="h-44 w-full" />
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <Skeleton className="h-32 w-full" />
+              <Skeleton className="h-32 w-full" />
+              <Skeleton className="h-32 w-full" />
+            </div>
+          </div>
+        ) : (
+          <Suspense
+            fallback={
+              <div className="w-full max-w-4xl mx-auto px-4 py-8 space-y-4">
+                <Skeleton className="h-64 w-full" />
+              </div>
+            }
+          >
+            {activeTab === 'home' && (
+              <DailyMissionHub
+                profile={profile}
+                onStartPractice={handleStartPractice}
+                onNavigateTab={handleNavigateTab}
+                onRetakeOnboarding={() => setShowOnboarding(true)}
+                onOpenBaseline={() => setShowBaselineModal(true)}
+              />
+            )}
+
+            {activeTab === 'practice' && (
+              <VoiceSessionView
+                profile={profile}
+                initialLessonId={activeLessonId}
+                onNavigateTab={handleNavigateTab}
+              />
+            )}
+
+            {activeTab === 'learn' && (
+              <LearnTabView
+                profile={profile}
+                initialTab={learnSubTab}
+                onStartPractice={(lessonId) => handleStartPractice(lessonId)}
+              />
+            )}
+
+            {activeTab === 'progress' && (
+              <ProgressTabView
+                profile={profile}
+                onOpenBaseline={() => setShowBaselineModal(true)}
+              />
+            )}
+          </Suspense>
         )}
-      </Suspense>
+      </main>
+
+      <footer className="w-full border-t border-[var(--border)] bg-[var(--surface)]/50 py-4 px-6 mt-auto">
+        <div className="max-w-5xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-[var(--muted)]">
+          <div className="flex items-center gap-2">
+            <span className="font-serif font-bold text-[var(--text)]">Luma</span>
+            <span>•</span>
+            <span>12-Week Articulation & Fluency Platform</span>
+          </div>
+          <div className="flex items-center gap-4">
+            <button
+              type="button"
+              onClick={() => {
+                setSettingsSection('privacy');
+                setShowSettings(true);
+              }}
+              className="hover:text-[var(--text)] transition-colors cursor-pointer"
+            >
+              Privacy & Data
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setSettingsSection('settings');
+                setShowSettings(true);
+              }}
+              className="hover:text-[var(--text)] transition-colors cursor-pointer"
+            >
+              Preferences
+            </button>
+          </div>
+        </div>
+      </footer>
+
+      {showOnboarding && (
+        <OnboardingWizard
+          onComplete={(updatedProfile, launchBaseline) => {
+            if (updatedProfile) setProfile(updatedProfile);
+            setShowOnboarding(false);
+            if (launchBaseline) setShowBaselineModal(true);
+          }}
+          onCancel={() => setShowOnboarding(false)}
+        />
+      )}
+
+      <BaselineAssessmentModal
+        isOpen={showBaselineModal}
+        nativeLanguage={profile?.bridgeLanguage || profile?.bridge_language || 'ta'}
+        onClose={() => setShowBaselineModal(false)}
+        onCompleteBaseline={() => {
+          setShowBaselineModal(false);
+          setActiveTab('practice');
+        }}
+      />
+
+      <SettingsModal
+        isOpen={showSettings}
+        onClose={() => setShowSettings(false)}
+        profile={profile}
+        initialSection={settingsSection}
+        theme={theme}
+        setTheme={setTheme}
+        onUpdateProfile={(updated) => setProfile(updated)}
+        onLogout={handleLogout}
+      />
     </div>
   );
 }

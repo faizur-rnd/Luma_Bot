@@ -1,159 +1,193 @@
 import React, { useState, useEffect } from 'react';
-import { Card, StatusPill, Skeleton, EmptyState } from './ui';
-import { apiClient, UserProfile, AssessmentAttempt } from '../services/apiClient';
+import { Flame, CheckCircle2, Award, TrendingUp, Calendar, Volume2 } from 'lucide-react';
+import { apiClient, UserProfile, AssessmentAttempt } from '../services/apiClient.ts';
+import { Card } from './ui/Card.tsx';
+import { Skeleton } from './ui/Skeleton.tsx';
+import { EmptyState } from './ui/EmptyState.tsx';
+import { ErrorState } from './ui/ErrorState.tsx';
+import { StatusPill } from './ui/StatusPill.tsx';
+import { ReportAndRetestPanel } from './progress/ReportAndRetestPanel.tsx';
 
 interface ProgressTabViewProps {
   profile: UserProfile | null;
+  onOpenBaseline?: () => void;
 }
 
-export const ProgressTabView: React.FC<ProgressTabViewProps> = ({ profile }) => {
-  const [assessments, setAssessments] = useState<AssessmentAttempt[]>([]);
-  const [summary, setSummary] = useState<{ actual?: { speakingMinutes?: number; completedCount?: number } } | null>(null);
+export const ProgressTabView: React.FC<ProgressTabViewProps> = ({ profile, onOpenBaseline }) => {
+  const [attempts, setAttempts] = useState<AssessmentAttempt[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const loadAttempts = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await apiClient.getAssessments();
+      setAttempts(data);
+    } catch (e: any) {
+      setError(e?.message || 'Failed to load progress history.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    let active = true;
-    Promise.allSettled([
-      apiClient.getAssessments(),
-      apiClient.getMissionsSummary()
-    ]).then(([assessmentsRes, summaryRes]) => {
-      if (!active) return;
-      if (assessmentsRes.status === 'fulfilled' && Array.isArray(assessmentsRes.value)) {
-        setAssessments(assessmentsRes.value);
-      }
-      if (summaryRes.status === 'fulfilled' && summaryRes.value) {
-        setSummary(summaryRes.value);
-      }
-      setLoading(false);
-    });
-
-    return () => { active = false; };
+    loadAttempts();
   }, []);
 
-  const streak = profile?.streak_count || 0;
-  const minutesSpoken = summary?.actual?.speakingMinutes || 0;
-  const completedPractices = summary?.actual?.completedCount || assessments.length;
+  if (error) {
+    return (
+      <div className="max-w-4xl mx-auto px-4 py-8">
+        <ErrorState message={error} onRetry={loadAttempts} />
+      </div>
+    );
+  }
+
+  const streak = profile?.streak_count || profile?.streakCount || 0;
+  const totalSessions = attempts.length;
+
+  const validClarityScores = attempts
+    .map((a) => a.completion_score ?? a.overall_score)
+    .filter((s): s is number => typeof s === 'number' && !isNaN(s));
+
+  const avgClarity =
+    validClarityScores.length > 0
+      ? Math.round(validClarityScores.reduce((a, b) => a + b, 0) / validClarityScores.length)
+      : null;
+
+  const validPronunciationScores = attempts
+    .map((a) => a.pronunciation_score)
+    .filter((s): s is number => typeof s === 'number' && !isNaN(s));
+
+  const avgPronunciation =
+    validPronunciationScores.length > 0
+      ? Math.round(validPronunciationScores.reduce((a, b) => a + b, 0) / validPronunciationScores.length)
+      : null;
 
   return (
-    <div className="max-w-[960px] mx-auto px-4 py-6 space-y-8">
-      {/* Page Title */}
-      <div className="border-b border-[var(--border)] pb-4">
-        <h1 className="text-2xl font-bold text-[var(--text)] tracking-tight">Your Progress</h1>
-        <p className="text-sm text-[var(--muted)] mt-1">
-          Honest metrics grounded in verified practice sessions.
+    <div className="w-full max-w-4xl mx-auto px-4 py-6 space-y-8">
+      <div>
+        <h1 className="text-2xl font-serif font-bold text-[var(--text)]">Your Progress</h1>
+        <p className="text-sm text-[var(--muted)]">
+          Verified performance metrics, 12-week checkpoints, and assessment history.
         </p>
       </div>
 
-      {/* Metrics Row */}
-      <div className="grid gap-4 sm:grid-cols-3">
-        {/* Streak */}
-        <Card className="flex flex-col justify-between">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-semibold text-[var(--muted)]">Practice streak</span>
-            <span className="text-xl" aria-hidden="true">🔥</span>
+      <ReportAndRetestPanel onOpenBaseline={onOpenBaseline} />
+
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <Card className="p-5 space-y-2">
+          <div className="flex items-center justify-between text-[var(--muted)]">
+            <span className="text-xs font-bold uppercase tracking-wider">Current Streak</span>
+            <Flame size={18} className="text-[var(--warning)]" />
           </div>
-          <div className="text-3xl font-extrabold text-[var(--text)]">
-            {loading ? <Skeleton height={36} width={60} /> : `${streak} ${streak === 1 ? 'day' : 'days'}`}
+          <div className="text-3xl font-serif font-bold text-[var(--text)]">
+            {streak} <span className="text-sm font-sans font-normal text-[var(--muted)]">days</span>
           </div>
-          <p className="text-xs text-[var(--muted)] mt-2">
-            Counts consecutive days with at least 3 minutes of practice.
-          </p>
         </Card>
 
-        {/* Minutes Spoken */}
-        <Card className="flex flex-col justify-between">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-semibold text-[var(--muted)]">Minutes spoken this week</span>
-            <span className="text-xl" aria-hidden="true">⏱️</span>
+        <Card className="p-5 space-y-2">
+          <div className="flex items-center justify-between text-[var(--muted)]">
+            <span className="text-xs font-bold uppercase tracking-wider">Assessments</span>
+            <CheckCircle2 size={18} className="text-[var(--success)]" />
           </div>
-          <div className="text-3xl font-extrabold text-[var(--text)]">
-            {loading ? <Skeleton height={36} width={60} /> : `${minutesSpoken} min`}
+          <div className="text-3xl font-serif font-bold text-[var(--text)]">
+            {loading ? <Skeleton className="h-9 w-16" /> : totalSessions}
           </div>
-          <p className="text-xs text-[var(--muted)] mt-2">
-            Logged across active conversational voice sessions.
-          </p>
         </Card>
 
-        {/* Completed practices */}
-        <Card className="flex flex-col justify-between">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-semibold text-[var(--muted)]">Completed practices</span>
-            <span className="text-xl" aria-hidden="true">✅</span>
+        <Card className="p-5 space-y-2">
+          <div className="flex items-center justify-between text-[var(--muted)]">
+            <span className="text-xs font-bold uppercase tracking-wider">Avg Clarity</span>
+            <TrendingUp size={18} className="text-[var(--accent)]" />
           </div>
-          <div className="text-3xl font-extrabold text-[var(--text)]">
-            {loading ? <Skeleton height={36} width={60} /> : completedPractices}
+          <div className="text-3xl font-serif font-bold text-[var(--text)]">
+            {loading ? (
+              <Skeleton className="h-9 w-16" />
+            ) : avgClarity !== null ? (
+              `${avgClarity}%`
+            ) : (
+              <span className="text-sm font-sans text-[var(--muted)]">Not Measured</span>
+            )}
           </div>
-          <p className="text-xs text-[var(--muted)] mt-2">
-            Total conversational sessions and explain-backs.
-          </p>
+        </Card>
+
+        <Card className="p-5 space-y-2">
+          <div className="flex items-center justify-between text-[var(--muted)]">
+            <span className="text-xs font-bold uppercase tracking-wider">Pronunciation</span>
+            <Volume2 size={18} className="text-[var(--accent)]" />
+          </div>
+          <div className="text-3xl font-serif font-bold text-[var(--text)]">
+            {loading ? (
+              <Skeleton className="h-9 w-16" />
+            ) : avgPronunciation !== null ? (
+              `${avgPronunciation}%`
+            ) : (
+              <span className="text-sm font-sans text-[var(--muted)]">Not Available</span>
+            )}
+          </div>
         </Card>
       </div>
 
-      {/* Unmeasured metrics disclosure */}
-      <Card className="bg-[var(--surface-2)] border-[var(--border)]">
-        <h3 className="text-sm font-bold text-[var(--text)] mb-3">Measurement Disclosures</h3>
-        <div className="grid gap-3 sm:grid-cols-2 text-sm">
-          <div className="p-3 rounded-lg border border-[var(--border)] bg-[var(--surface)]">
-            <div className="flex justify-between items-center mb-1">
-              <span className="font-semibold text-[var(--text)]">Pronunciation</span>
-              <StatusPill label="Not measured yet" variant="neutral" />
-            </div>
-            <p className="text-xs text-[var(--muted)]">
-              Browser speech recognition provides text transcripts only; acoustic scoring is not currently performed.
-            </p>
-          </div>
-          <div className="p-3 rounded-lg border border-[var(--border)] bg-[var(--surface)]">
-            <div className="flex justify-between items-center mb-1">
-              <span className="font-semibold text-[var(--text)]">Fluency certification</span>
-              <StatusPill label="Not measured yet" variant="neutral" />
-            </div>
-            <p className="text-xs text-[var(--muted)]">
-              Formal standardized certification requires proctored spoken testing.
-            </p>
-          </div>
-        </div>
-      </Card>
-
-      {/* Explain it back history */}
       <div className="space-y-4">
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-bold text-[var(--text)]">Explain-it-back history</h2>
-          <span className="text-xs text-[var(--muted)]">{assessments.length} evaluated</span>
+          <h2 className="text-lg font-serif font-bold text-[var(--text)] flex items-center gap-2">
+            <Calendar size={18} className="text-[var(--accent)]" /> Assessment History
+          </h2>
+          <span className="text-xs text-[var(--muted)]">Showing verified logs</span>
         </div>
 
         {loading ? (
           <div className="space-y-3">
-            <Skeleton height={64} />
-            <Skeleton height={64} />
+            {[1, 2, 3].map((i) => (
+              <Skeleton key={i} className="h-24 w-full" />
+            ))}
           </div>
-        ) : assessments.length === 0 ? (
+        ) : attempts.length === 0 ? (
           <EmptyState
-            title="No explain-it-back attempts yet"
-            description="Complete a practice session in the Learn tab to see your evaluations and feedback here."
+            icon={<Award size={28} />}
+            title="No assessments recorded yet"
+            description="Complete an Explain It Back challenge or Daily Session to see your verified scores here."
           />
         ) : (
           <div className="space-y-3">
-            {assessments.slice(0, 10).map((a) => (
-              <Card key={a.id} className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <span className="font-semibold text-[var(--text)]">
-                      {a.topic_title || 'Spoken Practice'}
-                    </span>
-                    <StatusPill
-                      label={`${a.overall_score || 0}/100`}
-                      variant={(a.overall_score || 0) >= 70 ? 'success' : 'warning'}
-                    />
+            {attempts.map((attempt) => {
+              const hasPron = attempt.pronunciation_score !== null && attempt.pronunciation_score !== undefined;
+              const clarityVal = attempt.completion_score ?? attempt.overall_score;
+              const hasComp = clarityVal !== null && clarityVal !== undefined;
+              return (
+                <Card key={attempt.id} className="p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div className="space-y-1.5 flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-xs font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-[var(--accent)]/10 text-[var(--accent)]">
+                        {attempt.topic_title}
+                      </span>
+                      <StatusPill status={hasPron ? 'measured' : hasComp ? 'estimated' : 'unavailable'} />
+                      <span className="text-xs text-[var(--muted)]">
+                        {new Date(attempt.created_at).toLocaleDateString(undefined, {
+                          month: 'short',
+                          day: 'numeric',
+                          year: 'numeric',
+                        })}
+                      </span>
+                    </div>
+                    <p className="text-sm text-[var(--text)] line-clamp-2 italic">"{attempt.transcribed_text}"</p>
+                    {attempt.coaching_feedback && (
+                      <p className="text-xs text-[var(--muted)] line-clamp-2 pt-1">{attempt.coaching_feedback}</p>
+                    )}
                   </div>
-                  <p className="text-xs text-[var(--muted)] line-clamp-1">
-                    {a.transcribed_text || 'Completed practice submission'}
-                  </p>
-                </div>
-                <div className="text-right text-xs text-[var(--muted)] whitespace-nowrap">
-                  {a.created_at ? new Date(a.created_at).toLocaleDateString() : 'Recent'}
-                </div>
-              </Card>
-            ))}
+
+                  <div className="flex sm:flex-col items-center sm:items-end justify-between border-t sm:border-t-0 pt-3 sm:pt-0 border-[var(--border)] shrink-0">
+                    <div className="text-2xl font-serif font-bold text-[var(--accent)]">
+                      {hasComp ? `${clarityVal}%` : '—'}
+                    </div>
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-[var(--muted)]">
+                      Clarity Score
+                    </span>
+                  </div>
+                </Card>
+              );
+            })}
           </div>
         )}
       </div>

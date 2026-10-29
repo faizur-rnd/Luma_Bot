@@ -346,7 +346,10 @@ export async function generateSpeechAudio(options: TTSRequestOptions): Promise<T
   }
 
   try {
-    const ai = new GoogleGenAI({ apiKey });
+    const ai = new GoogleGenAI({
+      apiKey,
+      httpOptions: { headers: { 'User-Agent': 'aistudio-build' } }
+    });
     const isArabic = options.language === 'ar' || /[\u0600-\u06FF]/.test(options.text);
     const isGerman = options.language === 'de';
     const isSpanish = options.language === 'es';
@@ -362,7 +365,7 @@ export async function generateSpeechAudio(options: TTSRequestOptions): Promise<T
     const voiceName = options.gender === 'female' ? "Kore" : "Puck";
 
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
+      model: "gemini-3.8-flash-lite-tts",
       contents: [
         {
           role: "user",

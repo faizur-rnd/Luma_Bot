@@ -734,35 +734,6 @@ router.post('/assessments', async (req, res) => {
 });
 
 
-// Text-to-Speech Endpoint
-router.post('/tts', async (req, res) => {
-  try {
-    const { text, language, gender } = req.body;
-    if (!text || typeof text !== 'string') {
-      return res.status(400).json({ error: 'Text string is required', requestId: req.requestId });
-    }
-
-    const result = await generateSpeechAudio({
-      text,
-      language: language || req.user?.targetLanguage || 'en',
-      gender: gender || 'male'
-    });
-
-    if (result) {
-      return res.json(result);
-    }
-
-    // Honest fallback directive: notify client to use native browser SpeechSynthesis
-    res.status(503).json({
-      error: 'Neural TTS unavailable',
-      provider: 'browser_speech_synthesis',
-      message: 'Use browser SpeechSynthesis for voice playback.'
-    });
-  } catch (err: any) {
-    res.status(500).json({ error: 'TTS request failed', requestId: req.requestId });
-  }
-});
-
 // Curriculum & Onboarding
 router.get('/onboarding', async (req, res) => {
   const answers = await db.getOnboarding(req.user!.id);

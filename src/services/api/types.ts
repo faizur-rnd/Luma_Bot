@@ -127,3 +127,18 @@ export interface PhonemeMasteryItem {
   lastSeen: string;
   nextReviewAt: string;
 }
+
+export interface PronunciationPhonemeScore {
+  phoneme: string;
+  score: number | null;
+}
+
+export interface PronunciationScoreResult {
+  status: 'measured' | 'estimated' | 'unavailable';
+  overallScore: number | null;
+  intelligibilityScore: number | null;
+  fluencyScore: number | null;
+  disclosure: string;
+  phonemes?: PronunciationPhonemeScore[];
+}
+

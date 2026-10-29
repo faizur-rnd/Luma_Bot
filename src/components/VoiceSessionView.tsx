@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { BookOpen, Sparkles } from 'lucide-react';
+import { BookOpen } from 'lucide-react';
 import { VoiceOrb, VoiceSessionState } from './VoiceOrb.tsx';
 import { ConversationTranscript, MessageEntry } from './voice/ConversationTranscript.tsx';
 import { VoiceControls } from './voice/VoiceControls.tsx';
 import { LessonSelectorDrawer } from './voice/LessonSelectorDrawer.tsx';
 import { VoiceGenderToggle, VoiceGender } from './voice/VoiceGenderToggle.tsx';
+import { DailySessionStageBar } from './voice/DailySessionStageBar.tsx';
 import { StellarBurst } from './animations/StellarBurst.tsx';
 import { SpeechController } from '../services/speechController.ts';
 import { apiClient, UserProfile, CurriculumModule, CurriculumLesson } from '../services/apiClient.ts';
@@ -17,7 +18,11 @@ interface VoiceSessionViewProps {
   onUpdateProfile?: (profile: UserProfile) => void;
 }
 
-export const VoiceSessionView: React.FC<VoiceSessionViewProps> = ({ profile, initialLessonId }) => {
+export const VoiceSessionView: React.FC<VoiceSessionViewProps> = ({
+  profile,
+  initialLessonId,
+  onNavigateTab
+}) => {
   const [orbState, setOrbState] = useState<VoiceSessionState>('idle');
   const [audioLevel, setAudioLevel] = useState<number>(0);
   const [messages, setMessages] = useState<MessageEntry[]>([]);
@@ -29,52 +34,61 @@ export const VoiceSessionView: React.FC<VoiceSessionViewProps> = ({ profile, ini
   const [selectedLesson, setSelectedLesson] = useState<CurriculumLesson | null>(null);
   const [showLessonDrawer, setShowLessonDrawer] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [voiceGender, setVoiceGender] = useState<VoiceGender>(() => (localStorage.getItem('luma_ice_voice_gender') as VoiceGender) || 'female');
+  const [voiceGender, setVoiceGender] = useState<VoiceGender>(
+    () => (localStorage.getItem('luma_ice_voice_gender') as VoiceGender) || 'female'
+  );
   const [showCelebration, setShowCelebration] = useState(false);
 
   const speechControllerRef = useRef<SpeechController | null>(null);
-  const targetLang = profile?.targetLanguage || 'en';
-  const bridgeLang = profile?.bridgeLanguage || 'ta';
+  const targetLang = profile?.targetLanguage || profile?.target_language || 'en';
+  const bridgeLang = profile?.bridgeLanguage || profile?.bridge_language || 'ta';
 
   useEffect(() => {
-    apiClient.getCurriculum(targetLang).then((mods) => {
-      setModules(mods);
-      if (mods.length > 0 && !selectedLesson) {
-        const found = initialLessonId ? mods.flatMap(m => m.lessons || []).find(l => l.id === initialLessonId) : null;
-        setSelectedLesson(found || mods[0].lessons?.[0] || null);
-      }
-    }).catch(() => {});
+    apiClient
+      .getCurriculum(targetLang)
+      .then((mods) => {
+        setModules(mods);
+        if (mods.length > 0 && !selectedLesson) {
+          const found = initialLessonId
+            ? mods.flatMap((m) => m.lessons || []).find((l) => l.id === initialLessonId)
+            : null;
+          setSelectedLesson(found || mods[0].lessons?.[0] || null);
+        }
+      })
+      .catch(() => {});
   }, [targetLang, initialLessonId]);
 
   useEffect(() => {
-    const controller = new SpeechController({
-      onStateChange: (newState) => {
-        setOrbState(newState);
-        if (newState === 'listening') setIsListening(true);
-        if (newState === 'idle' || newState === 'offline_error') setIsListening(false);
-      },
-      onTranscript: (text, isFinal) => {
-        if (isFinal) {
-          setCurrentTranscript('');
-          submitUserMessage(text);
-        } else {
-          setCurrentTranscript(text);
+    const controller = new SpeechController(
+      {
+        onStateChange: (newState) => {
+          setOrbState(newState);
+          if (newState === 'listening') setIsListening(true);
+          if (newState === 'idle' || newState === 'offline_error') setIsListening(false);
+        },
+        onTranscript: (text, isFinal) => {
+          if (isFinal) {
+            setCurrentTranscript('');
+            submitUserMessage(text);
+          } else {
+            setCurrentTranscript(text);
+          }
+        },
+        onAudioLevel: (lvl) => setAudioLevel(lvl),
+        onError: (msg) => {
+          setErrorMessage(msg);
+          setOrbState('idle');
         }
       },
-      onAudioLevel: (lvl) => setAudioLevel(lvl),
-      onError: (msg) => {
-        console.warn('Speech controller error:', msg);
-        setOrbState('offline_error');
-        setErrorMessage("Microphone offline. Tap to retry.");
-      }
-    }, targetLang);
+      targetLang
+    );
 
     controller.setVoiceGender(voiceGender);
+    controller.setSlowerSpeech(isSlowerSpeech);
     speechControllerRef.current = controller;
 
     return () => {
-      controller.stopListening();
-      controller.stopSpeaking();
+      controller.dispose();
     };
   }, [targetLang]);
 
@@ -83,41 +97,52 @@ export const VoiceSessionView: React.FC<VoiceSessionViewProps> = ({ profile, ini
     if (speechControllerRef.current) {
       speechControllerRef.current.setVoiceGender(newGender);
       speechControllerRef.current.speak(
-        newGender === 'female' ? "Switched to female speaking coach." : "Switched to male speaking coach.",
+        newGender === 'female' ? 'Switched to female speaking coach.' : 'Switched to male speaking coach.',
         () => setOrbState('idle'),
         targetLang
       );
     }
   };
 
+  const handleStopSpeaking = () => {
+    speechControllerRef.current?.stopSpeaking();
+    setOrbState('idle');
+  };
+
   const handleToggleMic = async () => {
     if (!speechControllerRef.current) return;
+    if (orbState === 'speaking') speechControllerRef.current.stopSpeaking();
     if (isListening) {
-      speechControllerRef.current.stopListening();
+      await speechControllerRef.current.stopListening();
       setIsListening(false);
       setOrbState('idle');
       if (currentTranscript.trim()) {
-        submitUserMessage(currentTranscript.trim());
+        const textToSubmit = currentTranscript.trim();
         setCurrentTranscript('');
+        submitUserMessage(textToSubmit);
       }
     } else {
       setErrorMessage(null);
       const ok = await speechControllerRef.current.startListening();
-      if (!ok) {
-        setOrbState('offline_error');
-        setErrorMessage("Microphone blocked or not accessible.");
-      }
+      if (!ok) setIsListening(false);
     }
   };
 
   const submitUserMessage = async (text: string) => {
     if (!text.trim()) return;
+    setErrorMessage(null);
+    const cleanText = text.trim();
     const userMsg: MessageEntry = {
       id: `usr_${Date.now()}`,
       sender: 'user',
-      text: text.trim(),
+      text: cleanText,
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     };
+
+    const historyPayload = messages.slice(-8).map((m) => ({
+      role: (m.sender === 'user' ? 'user' : 'model') as 'user' | 'model',
+      content: m.text
+    }));
 
     setMessages((prev) => [...prev, userMsg]);
     setTextInput('');
@@ -125,14 +150,14 @@ export const VoiceSessionView: React.FC<VoiceSessionViewProps> = ({ profile, ini
 
     try {
       const response = await apiClient.sendChatMessage({
-        message: text.trim(),
+        message: cleanText,
+        history: historyPayload,
         targetLanguage: targetLang,
         bridgeLanguage: bridgeLang,
-        lessonContext: selectedLesson ? {
-          title: selectedLesson.title,
-          objective: selectedLesson.objective,
-          samplePhrases: selectedLesson.samplePhrases
-        } : undefined
+        proficiencyLevel: profile?.proficiencyLevel || profile?.proficiency_level || 'B1',
+        lessonContext: selectedLesson
+          ? { title: selectedLesson.title, objective: selectedLesson.objective, samplePhrases: selectedLesson.samplePhrases }
+          : undefined
       });
 
       const lumaEntry: MessageEntry = {
@@ -142,30 +167,24 @@ export const VoiceSessionView: React.FC<VoiceSessionViewProps> = ({ profile, ini
         translation: response.translation,
         correction: response.correction,
         phonemeCue: response.pronunciationTip,
+        followUps: Array.isArray(response.recommendedFollowUps) ? response.recommendedFollowUps : undefined,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
       };
 
       setMessages((prev) => {
         const next = [...prev, lumaEntry];
-        if (next.filter(m => m.sender === 'user').length % 3 === 0) {
-          setShowCelebration(true);
-        }
+        if (next.filter((m) => m.sender === 'user').length % 3 === 0) setShowCelebration(true);
         return next;
       });
       setOrbState('speaking');
-
-      if (speechControllerRef.current) {
-        speechControllerRef.current.speak(response.reply, () => setOrbState('idle'), targetLang);
-      } else {
-        setOrbState('idle');
-      }
-    } catch (e: any) {
-      const fallbackReply = targetLang === 'ar'
-        ? `أَهْلًا بِكَ! سَمِعْتُكَ تَقُولُ: «${text.trim()}». دَعْنَا نُوَاصِلُ التَّدْرِيبَ عَلَى النُّطْقِ الصَّحِيحِ.`
-        : `I heard you clearly: "${text.trim()}". Excellent cadence! Let's continue practicing.`;
-
+      speechControllerRef.current?.speak(response.reply, () => setOrbState('idle'), targetLang);
+    } catch {
+      const fallbackReply = `I heard your phrase: "${cleanText}". Keep your airflow steady on the stressed syllable—try repeating it once more or ask for a minimal pair drill.`;
       const fallbackEntry: MessageEntry = {
-        id: `lum_${Date.now()}`, sender: 'luma', text: fallbackReply,
+        id: `lum_${Date.now()}`,
+        sender: 'luma',
+        text: fallbackReply,
+        followUps: ['Give me a minimal pair for this sound', 'Let’s practice workplace phrasing'],
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
       };
       setMessages((prev) => [...prev, fallbackEntry]);
@@ -176,14 +195,19 @@ export const VoiceSessionView: React.FC<VoiceSessionViewProps> = ({ profile, ini
 
   const handleRepeatLastReply = () => {
     const last = [...messages].reverse().find((m) => m.sender === 'luma');
-    if (last && speechControllerRef.current) {
+    const phrase = last?.text || selectedLesson?.samplePhrases?.[0] || 'Welcome to LUMA speaking practice.';
+    if (speechControllerRef.current) {
       setOrbState('speaking');
-      speechControllerRef.current.speak(last.text, () => setOrbState('idle'), targetLang);
+      speechControllerRef.current.speak(phrase, () => setOrbState('idle'), targetLang);
     }
   };
 
   const handleToggleSlower = () => {
-    setIsSlowerSpeech((prev) => !prev);
+    setIsSlowerSpeech((prev) => {
+      const next = !prev;
+      speechControllerRef.current?.setSlowerSpeech(next);
+      return next;
+    });
   };
 
   const handleSpeakText = (text: string) => {
@@ -194,106 +218,60 @@ export const VoiceSessionView: React.FC<VoiceSessionViewProps> = ({ profile, ini
   };
 
   const statusWords: Record<VoiceSessionState, string> = {
-    idle: 'Tap to speak', listening: 'Listening...', transcribing: 'Processing...',
-    thinking: 'Formulating guidance...', speaking: 'Speaking...',
-    interrupted: 'Interrupted', offline_error: 'Microphone unavailable'
+    idle: 'Ready — Tap Orb or Start Speaking',
+    listening: 'Listening to your speech...',
+    transcribing: 'Transcribing speech...',
+    thinking: 'Formulating coaching feedback...',
+    speaking: 'Coach speaking...',
+    interrupted: 'Interrupted',
+    offline_error: 'Microphone notice'
   };
 
   const hasMessages = messages.length > 0;
 
   return (
-    <div className="flex-1 flex flex-col h-[calc(100dvh-4rem)] max-w-[1020px] mx-auto w-full px-3 sm:px-6">
-      {/* Celebration Stellar Bloom overlay */}
-      <StellarBurst
-        active={showCelebration}
-        onComplete={() => setShowCelebration(false)}
-        title="Fluency Momentum!"
-        subtitle="3 dialogue turns articulated cleanly"
-      />
+    <div className="flex-1 flex flex-col h-[calc(100dvh-4rem)] max-w-[1060px] mx-auto w-full px-3 sm:px-6">
+      <StellarBurst active={showCelebration} onComplete={() => setShowCelebration(false)} title="Fluency Momentum!" subtitle="3 dialogue turns articulated cleanly" />
 
-      {/* Top Scenario & Voice Switch Bar */}
-      <div className="py-2.5 px-4 my-2 rounded-2xl border border-[var(--border)] bg-[var(--surface)] flex items-center justify-between text-xs sm:text-sm shrink-0 shadow-sm backdrop-blur-md">
+      <div className="py-2 px-4 mt-2 mb-1.5 rounded-2xl border border-[var(--border)] bg-[var(--surface)] flex items-center justify-between text-xs sm:text-sm shrink-0 shadow-sm">
         <div className="flex items-center gap-2 overflow-hidden">
-          <BookOpen className="w-4 h-4 text-indigo-400 shrink-0" />
-          <span className="font-bold text-[var(--text)] truncate">
-            {selectedLesson ? selectedLesson.title : 'Articulation & Rhythm Workshop'}
-          </span>
+          <BookOpen className="w-4 h-4 text-[var(--accent)] shrink-0" />
+          <span className="font-bold text-[var(--text)] truncate">{selectedLesson ? selectedLesson.title : 'Articulation & Rhythm Workshop'}</span>
         </div>
         <div className="flex items-center gap-2.5 shrink-0 ml-2">
           <VoiceGenderToggle gender={voiceGender} onToggle={handleGenderChange} compact={false} />
-          <button
-            onClick={() => setShowLessonDrawer(true)}
-            className="text-cyan-400 hover:text-cyan-300 font-bold cursor-pointer"
-          >
-            Change Drill
+          <button type="button" onClick={() => setShowLessonDrawer(true)} className="px-2.5 py-1 rounded-lg bg-[var(--surface-2)] border border-[var(--border)] hover:border-[var(--accent)] text-[var(--accent)] font-bold text-xs cursor-pointer transition-colors">
+            Change Topic
           </button>
         </div>
       </div>
 
-      {/* Main Responsive Grid: Orb on Left, Interactive Chat on Right */}
-      <div className="flex-1 flex flex-col lg:flex-row min-h-0 gap-3.5 pb-2">
-        {/* Left Column: Liquid Orb Presence */}
-        <div className={`flex flex-col items-center justify-center shrink-0 lg:w-5/12 transition-all duration-300 ${
-          hasMessages ? 'h-[130px] sm:h-[170px] lg:h-full' : 'h-[230px] sm:h-[290px] lg:h-full'
-        }`}>
-          <div aria-live="polite" className="text-xs font-semibold text-[var(--muted)] mb-1.5 flex items-center gap-1.5">
-            {errorMessage ? (
-              <span className="text-[var(--danger)]">{errorMessage}</span>
-            ) : (
-              <span>{statusWords[orbState]}</span>
-            )}
-          </div>
+      <DailySessionStageBar
+        targetLang={targetLang}
+        onSpeakModelText={handleSpeakText}
+        onSendStagePrompt={(prompt) => submitUserMessage(prompt)}
+        onNavigateProgress={onNavigateTab ? () => onNavigateTab('progress') : undefined}
+      />
 
-          <div 
-            className="relative flex items-center justify-center p-2 rounded-full"
-            style={{
-              isolation: 'isolate',
-              overflow: 'clip',
-              height: hasMessages ? 'clamp(96px, 18dvh, 200px)' : 'clamp(180px, 32dvh, 320px)',
-              maxHeight: '320px',
-              aspectRatio: '1 / 1'
-            }}
-          >
-            <VoiceOrb state={orbState} audioLevel={audioLevel} onClick={handleToggleMic} />
+      <div className="flex-1 flex flex-col lg:flex-row min-h-0 gap-3 pb-2">
+        <div className={`flex flex-col items-center justify-center shrink-0 lg:w-5/12 transition-all duration-300 ${hasMessages ? 'h-[120px] sm:h-[155px] lg:h-full' : 'h-[190px] sm:h-[240px] lg:h-full'}`}>
+          <div aria-live="polite" className="text-xs font-semibold text-[var(--muted)] mb-1 text-center px-2">
+            {errorMessage ? <span className="text-[var(--warning)]">{errorMessage}</span> : <span>{statusWords[orbState]}</span>}
+          </div>
+          <div className="relative flex items-center justify-center p-2 rounded-full max-w-[200px] max-h-[200px] w-full h-full">
+            <VoiceOrb state={orbState} audioLevel={audioLevel} onClick={handleToggleMic} className="w-full h-full" />
           </div>
         </div>
 
-        {/* Right Column: Interactive Speaking Coach Console */}
-        <div className="flex-1 flex flex-col min-h-0 bg-[var(--surface-2)] border border-[var(--border)] rounded-2xl overflow-hidden lg:w-7/12 shadow-xl">
-          <ConversationTranscript
-            messages={messages}
-            currentTranscript={currentTranscript}
-            targetLang={targetLang}
-            voiceGender={voiceGender}
-            onVoiceGenderChange={handleGenderChange}
-            isAudioActive={isListening || orbState === 'speaking'}
-            audioLevel={audioLevel}
-            onSpeakText={handleSpeakText}
-            onSelectPrompt={(prompt) => submitUserMessage(prompt)}
-          />
-
-          <VoiceControls
-            orbState={orbState}
-            isListening={isListening}
-            isSlowerSpeech={isSlowerSpeech}
-            audioLevel={audioLevel}
-            textInput={textInput}
-            onToggleMic={handleToggleMic}
-            onRepeatLastReply={handleRepeatLastReply}
-            onToggleSlowerSpeech={handleToggleSlower}
-            onTextInputChange={setTextInput}
-            onSendTextMessage={() => submitUserMessage(textInput)}
-          />
+        <div className="flex-1 flex flex-col min-h-0 bg-[var(--surface)] border border-[var(--border)] rounded-2xl overflow-hidden shadow-md">
+          <ConversationTranscript messages={messages} currentTranscript={currentTranscript} targetLang={targetLang} voiceGender={voiceGender} onVoiceGenderChange={handleGenderChange} isAudioActive={orbState === 'speaking' || isListening} audioLevel={audioLevel} onSpeakText={handleSpeakText} onSelectPrompt={(prompt) => submitUserMessage(prompt)} />
+          <VoiceControls orbState={orbState} isListening={isListening} isSlowerSpeech={isSlowerSpeech} audioLevel={audioLevel} textInput={textInput} onToggleMic={handleToggleMic} onStopSpeaking={handleStopSpeaking} onRepeatLastReply={handleRepeatLastReply} onToggleSlowerSpeech={handleToggleSlower} onTextInputChange={setTextInput} onSendTextMessage={() => submitUserMessage(textInput)} />
         </div>
       </div>
 
-      <LessonSelectorDrawer
-        isOpen={showLessonDrawer}
-        modules={modules}
-        selectedLesson={selectedLesson}
-        onSelectLesson={(_, lesson) => setSelectedLesson(lesson)}
-        onClose={() => setShowLessonDrawer(false)}
-      />
+      {showLessonDrawer && (
+        <LessonSelectorDrawer isOpen={showLessonDrawer} modules={modules} selectedLesson={selectedLesson} onSelectLesson={(_mod, lesson) => { setSelectedLesson(lesson); setShowLessonDrawer(false); }} onClose={() => setShowLessonDrawer(false)} />
+      )}
     </div>
   );
 };

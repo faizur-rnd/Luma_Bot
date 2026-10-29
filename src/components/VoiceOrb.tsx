@@ -12,6 +12,20 @@ export interface VoiceOrbProps {
   onClick?: () => void;
 }
 
+function detectLowPowerOrReducedMotion(explicitReducedMotion: boolean): boolean {
+  if (explicitReducedMotion) return true;
+  if (typeof window === 'undefined') return true;
+  try {
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
+      return true;
+    }
+    if (typeof navigator !== 'undefined' && navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 4) {
+      return true;
+    }
+  } catch {}
+  return false;
+}
+
 export const VoiceOrb: React.FC<VoiceOrbProps> = ({
   state = 'idle',
   audioLevel = 0,
@@ -22,26 +36,24 @@ export const VoiceOrb: React.FC<VoiceOrbProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const mountRef = useRef<HTMLDivElement>(null);
   const sceneInstanceRef = useRef<any>(null);
-  const [useFallback, setUseFallback] = useState(reducedMotion);
+  const [useFallback, setUseFallback] = useState(() => detectLowPowerOrReducedMotion(reducedMotion));
 
-  // Status mapping for accessibility announcement
   const statusLabels: Record<VoiceSessionState, string> = {
-    idle: 'Tap to talk',
-    listening: 'Listening',
-    transcribing: 'Listening',
-    thinking: 'Thinking',
-    speaking: 'Speaking',
-    interrupted: 'Interrupted',
-    offline_error: 'Tutor unavailable'
+    idle: 'Start Speaking — Tap or press Enter to talk',
+    listening: 'Listening — Tap or press Enter to stop recording',
+    transcribing: 'Processing your speech',
+    thinking: 'Coach is preparing feedback',
+    speaking: 'Coach speaking — Tap or press Enter to interrupt',
+    interrupted: 'Interrupted — Tap to resume speaking',
+    offline_error: 'Microphone notice — Tap to retry speaking'
   };
 
   useEffect(() => {
-    if (reducedMotion) {
+    if (detectLowPowerOrReducedMotion(reducedMotion)) {
       setUseFallback(true);
       return;
     }
 
-    // Check WebGL availability
     const canvas = document.createElement('canvas');
     const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
     if (!gl) {
@@ -51,7 +63,6 @@ export const VoiceOrb: React.FC<VoiceOrbProps> = ({
 
     let isMounted = true;
 
-    // Dynamically lazy-load Three.js scene
     import('./orb/ThreeOrbScene.ts')
       .then(({ ThreeOrbScene }) => {
         if (!isMounted || !mountRef.current) return;
@@ -59,8 +70,7 @@ export const VoiceOrb: React.FC<VoiceOrbProps> = ({
           const scene = new ThreeOrbScene(mountRef.current, reducedMotion);
           sceneInstanceRef.current = scene;
           scene.updateState(state, audioLevel);
-        } catch (err) {
-          console.warn('Three.js initialization failed, using FallbackOrb:', err);
+        } catch {
           setUseFallback(true);
         }
       })
@@ -77,14 +87,12 @@ export const VoiceOrb: React.FC<VoiceOrbProps> = ({
     };
   }, [reducedMotion]);
 
-  // Update scene state when props change
   useEffect(() => {
     if (sceneInstanceRef.current) {
       sceneInstanceRef.current.updateState(state, audioLevel);
     }
   }, [state, audioLevel]);
 
-  // ResizeObserver for dynamic container tracking
   useEffect(() => {
     if (!mountRef.current) return;
     const ro = new ResizeObserver((entries) => {
@@ -100,13 +108,24 @@ export const VoiceOrb: React.FC<VoiceOrbProps> = ({
     return () => ro.disconnect();
   }, []);
 
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (!onClick) return;
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      onClick();
+    }
+  };
+
   return (
     <div
       ref={containerRef}
-      role="img"
+      role="button"
+      tabIndex={0}
+      aria-pressed={state === 'listening'}
       aria-label={`LUMA Voice Orb: ${statusLabels[state] || 'Ready'}`}
       onClick={onClick}
-      className={`relative flex items-center justify-center p-3 select-none cursor-pointer transition-transform active:scale-[0.98] ${className}`}
+      onKeyDown={handleKeyDown}
+      className={`relative flex items-center justify-center p-3 select-none cursor-pointer rounded-full transition-transform active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] ${className}`}
       style={{
         isolation: 'isolate',
         overflow: 'clip',
