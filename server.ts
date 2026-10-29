@@ -13,7 +13,8 @@ const __dirname = path.dirname(__filename);
 
 async function startServer() {
   const isProd = process.env.NODE_ENV === 'production';
-  const PORT = process.env.PORT || 3000;
+  // AI Studio requires the dev server to run strictly on port 3000
+  const PORT = isProd ? (process.env.PORT || 3000) : 3000;
 
   // 14. Production Safety Gate
   if (isProd) {
@@ -167,7 +168,7 @@ async function startServer() {
   } else {
     const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
-      server: { middlewareMode: true },
+      server: { middlewareMode: true, hmr: false },
       appType: 'spa'
     });
     app.use(vite.middlewares);

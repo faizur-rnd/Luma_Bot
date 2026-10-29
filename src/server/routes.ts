@@ -186,6 +186,9 @@ import { audioRouter } from './routes/audioRoutes.ts';
 import { scoringRouter } from './routes/scoringRoutes.ts';
 import { speechRouter } from './routes/speechRoutes.ts';
 import { drillRouter } from './routes/drillRoutes.ts';
+import { programRouter } from './routes/programRoutes.ts';
+import { checkpointRouter } from './routes/checkpointRoutes.ts';
+import { reportRouter } from './routes/reportRoutes.ts';
 
 // Mount session loader first, followed by CSRF Protection on mutating routes
 router.use(sessionLoaderMiddleware);
@@ -194,6 +197,9 @@ router.use(audioRouter);
 router.use(scoringRouter);
 router.use(speechRouter);
 router.use(drillRouter);
+router.use(programRouter);
+router.use(checkpointRouter);
+router.use(reportRouter);
 
 // ==========================================
 // Public Endpoints

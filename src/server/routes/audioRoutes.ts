@@ -14,7 +14,8 @@ const audioUploadLimiter = rateLimit({
   message: { error: 'Audio upload limit reached. Maximum 30 uploads per minute.', code: 'RATE_LIMIT_EXCEEDED' },
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) => req.user?.id || req.ip || 'anonymous'
+  validate: false,
+  keyGenerator: (req) => req.user?.id || 'anonymous'
 });
 
 // Helper: validate audio headers (WAV: RIFF/WAVE, WebM: 1A 45 DF A3)

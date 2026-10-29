@@ -34,10 +34,10 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     }[size];
 
     const variantStyles = {
-      primary: 'bg-[var(--accent)] text-[var(--accent-contrast)] hover:opacity-95 shadow-sm active:scale-[0.99]',
-      secondary: 'bg-[var(--surface-2)] text-[var(--text)] border border-[var(--border)] hover:bg-[var(--surface)] active:scale-[0.99]',
-      ghost: 'bg-transparent text-[var(--text)] hover:bg-[var(--surface-2)] active:scale-[0.99]',
-      danger: 'bg-[var(--danger)] text-white hover:opacity-95 active:scale-[0.99]'
+      primary: 'bg-[var(--accent)] text-[var(--accent-contrast)] hover:bg-[var(--accent-hover)] shadow-sm active:scale-[0.99] focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2',
+      secondary: 'bg-[var(--surface-2)] text-[var(--text)] border border-[var(--border)] hover:bg-[var(--surface-3)] active:scale-[0.99] focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2',
+      ghost: 'bg-transparent text-[var(--text)] hover:bg-[var(--surface-2)] active:scale-[0.99] focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2',
+      danger: 'bg-[var(--danger)] text-white hover:opacity-90 active:scale-[0.99] focus-visible:ring-2 focus-visible:ring-[var(--danger)] focus-visible:ring-offset-2'
     }[variant];
 
     const widthStyle = fullWidth ? 'w-full' : '';

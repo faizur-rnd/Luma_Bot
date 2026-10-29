@@ -46,17 +46,17 @@ export const Navbar: React.FC<NavbarProps> = ({
         <button
           type="button"
           onClick={onNavigateHome}
-          className="flex items-center gap-2.5 rounded-xl p-1 text-left focus:outline-none focus:ring-2 focus:ring-[var(--accent)] group cursor-pointer"
+          className="flex items-center gap-2.5 rounded-lg p-1 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] group cursor-pointer"
           aria-label="LUMA home"
         >
-          <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-indigo-500 via-purple-500 to-cyan-400 flex items-center justify-center text-white font-black text-sm shadow-md group-hover:scale-105 transition-transform">
+          <div className="w-8 h-8 rounded-lg bg-[var(--accent)] flex items-center justify-center text-[var(--accent-contrast)] font-bold text-sm shadow-xs group-hover:bg-[var(--accent-hover)] transition-colors">
             L
           </div>
           <div className="flex flex-col">
-            <span className="text-base font-black tracking-tight text-[var(--text)] leading-none">
+            <span className="text-base font-bold tracking-tight text-[var(--text)] leading-none">
               LUMA
             </span>
-            <span className="text-[10px] font-bold text-cyan-400 tracking-wider uppercase mt-0.5">
+            <span className="text-[10px] font-semibold text-[var(--accent)] tracking-wider uppercase mt-0.5">
               Speaking Coach
             </span>
           </div>
@@ -69,34 +69,34 @@ export const Navbar: React.FC<NavbarProps> = ({
             <select
               value={profile?.target_language || profile?.targetLanguage || 'en'}
               onChange={(e) => onLanguageChange?.(e.target.value)}
-              className="appearance-none bg-[var(--surface-2)] text-[var(--text)] border border-[var(--border)] rounded-full px-3 py-1.5 pr-6 text-xs font-semibold hover:border-[var(--accent)] transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
+              className="appearance-none bg-[var(--surface-2)] text-[var(--text)] border border-[var(--border)] rounded-md px-3 py-1.5 pr-6 text-xs font-medium hover:border-[var(--accent)] transition-all cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
               aria-label="Target language"
             >
-              <option value="en">🇬🇧 English Target</option>
-              <option value="ta">🇮🇳 Tamil (Wave 2)</option>
-              <option value="ar">🇸🇦 Arabic (Wave 2)</option>
+              <option value="en">English (Target)</option>
+              <option value="ta">Tamil (L1 Bridge)</option>
+              <option value="ar">Arabic (L1 Bridge)</option>
             </select>
             <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-[var(--muted)]">▼</span>
           </div>
 
-          {/* Glowing Streak Flame */}
+          {/* Streak Indicator */}
           <div
-            className="flex items-center gap-1.5 px-3 py-1 rounded-full border border-amber-500/30 bg-amber-500/10 text-xs font-bold text-amber-300 shadow-sm"
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-md border border-[var(--border)] bg-[var(--gold-subtle)] text-xs font-semibold text-[var(--warning)]"
             title={`${streak} consecutive practice days`}
           >
-            <Flame className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
-            <span>{streak}d</span>
+            <Flame className="w-3.5 h-3.5 text-[var(--warning)]" />
+            <span className="font-mono tabular-nums">{streak}d</span>
           </div>
 
           {/* Theme Toggle */}
           <button
             type="button"
             onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-            className="w-9 h-9 rounded-full border border-[var(--border)] bg-[var(--surface-2)] text-[var(--text)] hover:border-[var(--accent)] flex items-center justify-center transition-all cursor-pointer"
+            className="w-9 h-9 rounded-md border border-[var(--border)] bg-[var(--surface-2)] text-[var(--text)] hover:border-[var(--accent)] flex items-center justify-center transition-all cursor-pointer focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
             title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
             aria-label="Toggle theme"
           >
-            {theme === 'dark' ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-indigo-500" />}
+            {theme === 'dark' ? <Sun className="w-4 h-4 text-[var(--gold)]" /> : <Moon className="w-4 h-4 text-[var(--accent)]" />}
           </button>
 
           {/* Profile Menu Dropdown */}
@@ -104,7 +104,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             <button
               type="button"
               onClick={() => setMenuOpen(!menuOpen)}
-              className="w-9 h-9 rounded-full border border-[var(--border)] bg-gradient-to-tr from-indigo-600 to-cyan-500 text-white font-bold text-xs flex items-center justify-center hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-[var(--accent)] transition-all cursor-pointer"
+              className="w-9 h-9 rounded-md border border-[var(--border)] bg-[var(--peach)] text-[var(--text)] font-bold text-xs flex items-center justify-center hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] transition-all cursor-pointer"
               aria-expanded={menuOpen}
               aria-label="Learner profile menu"
             >
@@ -112,15 +112,15 @@ export const Navbar: React.FC<NavbarProps> = ({
             </button>
 
             {menuOpen && (
-              <div className="absolute right-0 mt-2 w-56 rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-2 shadow-2xl z-50 animate-fade-in-up">
+              <div className="absolute right-0 mt-2 w-56 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-2 shadow-lg z-50 animate-fade-in-up">
                 <div className="px-3 py-2 border-b border-[var(--border)] mb-1">
-                  <p className="text-xs font-bold text-[var(--text)] truncate">{displayName}</p>
+                  <p className="text-xs font-semibold text-[var(--text)] truncate">{displayName}</p>
                   <p className="text-[11px] text-[var(--muted)] truncate">{profile?.email || 'Guest'}</p>
                 </div>
 
                 <button
                   onClick={() => { setMenuOpen(false); onOpenSettings('settings'); }}
-                  className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold text-[var(--text)] hover:bg-[var(--surface-2)] transition-colors cursor-pointer text-left"
+                  className="w-full flex items-center gap-2 px-3 py-2 rounded-md text-xs font-medium text-[var(--text)] hover:bg-[var(--surface-2)] transition-colors cursor-pointer text-left"
                 >
                   <Settings className="w-4 h-4 text-[var(--muted)]" />
                   <span>Coach Settings & Voices</span>
@@ -128,7 +128,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
                 <button
                   onClick={() => { setMenuOpen(false); onOpenSettings('privacy'); }}
-                  className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold text-[var(--text)] hover:bg-[var(--surface-2)] transition-colors cursor-pointer text-left"
+                  className="w-full flex items-center gap-2 px-3 py-2 rounded-md text-xs font-medium text-[var(--text)] hover:bg-[var(--surface-2)] transition-colors cursor-pointer text-left"
                 >
                   <ShieldCheck className="w-4 h-4 text-[var(--muted)]" />
                   <span>Privacy Consents</span>
